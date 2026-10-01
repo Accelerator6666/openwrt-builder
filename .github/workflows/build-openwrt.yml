@@ -114,6 +114,7 @@ jobs:
             CONFIG_PACKAGE_dae-geoip
             CONFIG_PACKAGE_dae-geosite
             CONFIG_PACKAGE_luci-app-dae-ui
+            CONFIG_PACKAGE_ddns-go
           )
 
           for symbol in "${required_symbols[@]}"; do
@@ -125,6 +126,7 @@ jobs:
 
           test -f package/custom/dae/Makefile
           test -f package/custom/luci-app-dae-ui/Makefile
+          test -f package/custom/ddns-go/Makefile
 
           echo "DAE preflight checks passed."
 
