@@ -18,7 +18,7 @@ jobs:
   build:
     name: Build x86_64
     runs-on: ubuntu-24.04
-    timeout-minutes: 180
+    timeout-minutes: 300
 
     steps:
       - name: Checkout builder repository
@@ -38,7 +38,13 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update
-          sudo apt-get install -y             build-essential             clang             llvm             flex             bison             g++             gawk             gcc-multilib             g++-multilib             gettext             git             libncurses-dev             libssl-dev             libelf-dev             python3             python3-setuptools             python3-pyelftools             rsync             swig             unzip             zlib1g-dev             file             wget             curl             time             ccache             xsltproc             libxml-parser-perl             device-tree-compiler
+          sudo apt-get install -y             build-essential             clang             llvm             flex             bison             g++             gawk             gcc-multilib             g++-multilib             gettext             git             libncurses-dev             libssl-dev             libelf-dev             python3             python3-setuptools             python3-pyelftools             rsync             swig             unzip             zlib1g-dev             file             wget             curl             time             ccache             xsltproc             libxml-parser-perl             device-tree-compiler \
+            dwarves \
+            cmake \
+            ninja-build \
+            pkg-config \
+            python3-dev \
+            jq
 
           clang --version
           llvm-strip --version
@@ -118,6 +124,23 @@ jobs:
             CONFIG_PACKAGE_luci-app-ddns-go
             CONFIG_PACKAGE_kixdns
             CONFIG_PACKAGE_luci-app-kixdns-ui
+            CONFIG_PACKAGE_luci-app-partexp
+            CONFIG_PACKAGE_cpulimit
+            CONFIG_PACKAGE_luci-app-cpulimit
+            CONFIG_PACKAGE_luci-app-sqm
+            CONFIG_PACKAGE_sqm-scripts
+            CONFIG_KERNEL_DEBUG_FS
+            CONFIG_PACKAGE_einat-ebpf
+            CONFIG_PACKAGE_luci-app-einat
+            CONFIG_PACKAGE_luci-app-xlnetacc
+            CONFIG_PACKAGE_bandix
+            CONFIG_PACKAGE_luci-app-bandix
+            CONFIG_PACKAGE_kmod-oaf
+            CONFIG_PACKAGE_appfilter
+            CONFIG_PACKAGE_luci-app-oaf
+            CONFIG_PACKAGE_zerotier
+            CONFIG_PACKAGE_luci-app-zerotier
+            CONFIG_PACKAGE_luci-app-passwall
             CONFIG_PACKAGE_drill
           )
 
@@ -134,8 +157,30 @@ jobs:
           test -f package/custom/luci-app-ddns-go/Makefile
           test -f package/custom/kixdns/Makefile
           test -f package/custom/luci-app-kixdns-ui/Makefile
+          test -f package/custom/luci-app-partexp/Makefile
+          test -f package/custom/cpulimit/Makefile
+          test -f package/custom/luci-app-cpulimit/Makefile
+          test -f package/custom/einat-ebpf/Makefile
+          test -f package/custom/luci-app-einat/Makefile
+          test -f package/custom/luci-app-xlnetacc/Makefile
+          test -f package/custom/bandix/Makefile
+          test -f package/custom/luci-app-bandix/Makefile
+          test -f package/custom/oaf/Makefile
+          test -f package/custom/open-app-filter/Makefile
+          test -f package/custom/luci-app-oaf/Makefile
+          test -f package/custom/luci-app-zerotier/Makefile
+          test -f package/custom/luci-app-passwall/Makefile
+          test -f package/custom/chinadns-ng/Makefile
+          test -f package/custom/dns2socks/Makefile
+          test -f package/custom/geoview/Makefile
+          test -f package/custom/ipt2socks/Makefile
+          test -f package/custom/shadowsocks-rust/Makefile
+          test -f package/custom/shadowsocksr-libev/Makefile
+          test -f package/custom/simple-obfs/Makefile
+          test -f package/custom/tcping/Makefile
+          test -f package/custom/v2ray-plugin/Makefile
 
-          echo "DAE + DDNS-Go + KixDNS preflight checks passed."
+          echo "DAE + DDNS-Go + KixDNS + requested YAOF apps preflight checks passed."
 
       - name: Download package sources
         shell: bash
