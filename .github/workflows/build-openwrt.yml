@@ -38,21 +38,55 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update
-          sudo apt-get install -y             build-essential             clang             llvm             flex             bison             g++             gawk             gcc-multilib             g++-multilib             gettext             git             libncurses-dev             libssl-dev             libelf-dev             python3             python3-setuptools             python3-pyelftools             rsync             swig             unzip             zlib1g-dev             file             wget             curl             time             ccache             xsltproc             libxml-parser-perl             device-tree-compiler \
+          sudo apt-get install -y \
+            build-essential \
+            clang \
+            llvm \
+            flex \
+            bison \
+            g++ \
+            gawk \
+            gcc-multilib \
+            g++-multilib \
+            gettext \
+            git \
+            libncurses-dev \
+            libssl-dev \
+            libelf-dev \
+            python3 \
+            python3-dev \
+            python3-setuptools \
+            python3-pyelftools \
+            rsync \
+            swig \
+            unzip \
+            zlib1g-dev \
+            file \
+            wget \
+            curl \
+            time \
+            ccache \
+            xsltproc \
+            libxml-parser-perl \
+            device-tree-compiler \
             dwarves \
             cmake \
             ninja-build \
             pkg-config \
-            python3-dev \
             jq
 
           clang --version
           llvm-strip --version
+          pahole --version
 
       - name: Clone OpenWrt
         shell: bash
         run: |
-          git clone             --depth 1             --branch "$OPENWRT_REF"             "$OPENWRT_REPO"             openwrt
+          git clone \
+            --depth 1 \
+            --branch "$OPENWRT_REF" \
+            "$OPENWRT_REPO" \
+            openwrt
 
           cd openwrt
           git log -1 --oneline
@@ -61,7 +95,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: openwrt/dl
-          key: openwrt-dl-${{ env.OPENWRT_REF }}-${{ hashFiles('configs/**', 'scripts/**') }}
+          key: openwrt-dl-${{ env.OPENWRT_REF }}-${{ hashFiles('configs/**', 'scripts/**', 'package/custom/**') }}
           restore-keys: |
             openwrt-dl-${{ env.OPENWRT_REF }}-
             openwrt-dl-
@@ -76,7 +110,7 @@ jobs:
       - name: Run custom pre-build script
         shell: bash
         run: |
-          chmod +x scripts/custom.sh
+          chmod +x scripts/custom.sh scripts/integrate-yaof-packages.sh
           ./scripts/custom.sh "$GITHUB_WORKSPACE/openwrt"
 
       - name: Copy local custom packages
@@ -116,32 +150,49 @@ jobs:
             CONFIG_KERNEL_CGROUP_BPF
             CONFIG_KERNEL_DEBUG_INFO_BTF
             CONFIG_KERNEL_XDP_SOCKETS
+            CONFIG_KERNEL_DEBUG_FS
+
             CONFIG_PACKAGE_dae
             CONFIG_PACKAGE_dae-geoip
             CONFIG_PACKAGE_dae-geosite
             CONFIG_PACKAGE_luci-app-dae-ui
+
             CONFIG_PACKAGE_ddns-go
             CONFIG_PACKAGE_luci-app-ddns-go
+
             CONFIG_PACKAGE_kixdns
             CONFIG_PACKAGE_luci-app-kixdns-ui
+            CONFIG_PACKAGE_drill
+
             CONFIG_PACKAGE_luci-app-partexp
             CONFIG_PACKAGE_cpulimit
             CONFIG_PACKAGE_luci-app-cpulimit
             CONFIG_PACKAGE_luci-app-sqm
             CONFIG_PACKAGE_sqm-scripts
-            CONFIG_KERNEL_DEBUG_FS
+
             CONFIG_PACKAGE_einat-ebpf
             CONFIG_PACKAGE_luci-app-einat
             CONFIG_PACKAGE_luci-app-xlnetacc
             CONFIG_PACKAGE_bandix
             CONFIG_PACKAGE_luci-app-bandix
+
             CONFIG_PACKAGE_kmod-oaf
             CONFIG_PACKAGE_appfilter
             CONFIG_PACKAGE_luci-app-oaf
+
             CONFIG_PACKAGE_zerotier
             CONFIG_PACKAGE_luci-app-zerotier
+
             CONFIG_PACKAGE_luci-app-passwall
-            CONFIG_PACKAGE_drill
+            CONFIG_PACKAGE_luci-app-passwall_Nftables_Transparent_Proxy
+            CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Geoview
+            CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Haproxy
+            CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client
+            CONFIG_PACKAGE_luci-app-passwall_INCLUDE_ShadowsocksR_Libev_Client
+            CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Simple_Obfs
+            CONFIG_PACKAGE_luci-app-passwall_INCLUDE_SingBox
+            CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray_Plugin
+            CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Xray
           )
 
           for symbol in "${required_symbols[@]}"; do
@@ -151,34 +202,45 @@ jobs:
             fi
           done
 
-          test -f package/custom/dae/Makefile
-          test -f package/custom/luci-app-dae-ui/Makefile
-          test -f package/custom/ddns-go/Makefile
-          test -f package/custom/luci-app-ddns-go/Makefile
-          test -f package/custom/kixdns/Makefile
-          test -f package/custom/luci-app-kixdns-ui/Makefile
-          test -f package/custom/luci-app-partexp/Makefile
-          test -f package/custom/cpulimit/Makefile
-          test -f package/custom/luci-app-cpulimit/Makefile
-          test -f package/custom/einat-ebpf/Makefile
-          test -f package/custom/luci-app-einat/Makefile
-          test -f package/custom/luci-app-xlnetacc/Makefile
-          test -f package/custom/bandix/Makefile
-          test -f package/custom/luci-app-bandix/Makefile
-          test -f package/custom/oaf/Makefile
-          test -f package/custom/open-app-filter/Makefile
-          test -f package/custom/luci-app-oaf/Makefile
-          test -f package/custom/luci-app-zerotier/Makefile
-          test -f package/custom/luci-app-passwall/Makefile
-          test -f package/custom/chinadns-ng/Makefile
-          test -f package/custom/dns2socks/Makefile
-          test -f package/custom/geoview/Makefile
-          test -f package/custom/ipt2socks/Makefile
-          test -f package/custom/shadowsocks-rust/Makefile
-          test -f package/custom/shadowsocksr-libev/Makefile
-          test -f package/custom/simple-obfs/Makefile
-          test -f package/custom/tcping/Makefile
-          test -f package/custom/v2ray-plugin/Makefile
+          required_makefiles=(
+            package/custom/dae/Makefile
+            package/custom/luci-app-dae-ui/Makefile
+            package/custom/ddns-go/Makefile
+            package/custom/luci-app-ddns-go/Makefile
+            package/custom/kixdns/Makefile
+            package/custom/luci-app-kixdns-ui/Makefile
+
+            package/custom/luci-app-partexp/Makefile
+            package/custom/cpulimit/Makefile
+            package/custom/luci-app-cpulimit/Makefile
+            package/custom/einat-ebpf/Makefile
+            package/custom/luci-app-einat/Makefile
+            package/custom/luci-app-xlnetacc/Makefile
+            package/custom/bandix/Makefile
+            package/custom/luci-app-bandix/Makefile
+            package/custom/oaf/Makefile
+            package/custom/open-app-filter/Makefile
+            package/custom/luci-app-oaf/Makefile
+            package/custom/luci-app-zerotier/Makefile
+
+            package/custom/luci-app-passwall/Makefile
+            package/custom/chinadns-ng/Makefile
+            package/custom/dns2socks/Makefile
+            package/custom/geoview/Makefile
+            package/custom/ipt2socks/Makefile
+            package/custom/shadowsocks-rust/Makefile
+            package/custom/shadowsocksr-libev/Makefile
+            package/custom/simple-obfs/Makefile
+            package/custom/tcping/Makefile
+            package/custom/v2ray-plugin/Makefile
+          )
+
+          for makefile in "${required_makefiles[@]}"; do
+            if [ ! -f "$makefile" ]; then
+              echo "Required package Makefile is missing: $makefile" >&2
+              exit 1
+            fi
+          done
 
           echo "DAE + DDNS-Go + KixDNS + requested YAOF apps preflight checks passed."
 
@@ -200,6 +262,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p build-info
+
           {
             echo "OpenWrt ref: $OPENWRT_REF"
             echo "GitHub run: $GITHUB_RUN_ID"
@@ -211,6 +274,13 @@ jobs:
 
           if [ -f openwrt/.config ]; then
             cp openwrt/.config build-info/openwrt.config
+          fi
+
+          if [ -x openwrt/scripts/diffconfig.sh ]; then
+            (
+              cd openwrt
+              ./scripts/diffconfig.sh
+            ) > build-info/diffconfig.txt || true
           fi
 
       - name: Upload firmware
