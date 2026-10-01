@@ -145,13 +145,65 @@ echo "  commit : $DAE_UI_COMMIT"
 fetch_commit_archive   "$DAE_UI_REPO"   "$DAE_UI_COMMIT"   ""   "$DAE_UI_DEST"   "$TMP_ROOT/dae-ui"
 
 # ---------------------------------------------------------------------------
+# Custom LuCI KixDNS UI
+# ---------------------------------------------------------------------------
+
+KIXDNS_UI_DEST="$OPENWRT_DIR/package/custom/luci-app-kixdns-ui"
+
+rm -rf "$KIXDNS_UI_DEST"
+
+echo "Fetching custom KixDNS LuCI UI:"
+echo "  repo   : $KIXDNS_UI_REPO"
+echo "  commit : $KIXDNS_UI_COMMIT"
+
+fetch_commit_archive \
+  "$KIXDNS_UI_REPO" \
+  "$KIXDNS_UI_COMMIT" \
+  "" \
+  "$KIXDNS_UI_DEST" \
+  "$TMP_ROOT/kixdns-ui"
+
+# ---------------------------------------------------------------------------
 # Sanity checks
 # ---------------------------------------------------------------------------
 
 grep -q '^PKG_NAME:=dae$' "$DAE_DEST/Makefile"
 grep -q '^PKG_NAME:=ddns-go$' "$DDNS_GO_DEST/Makefile"
 grep -q '^PKG_NAME:=luci-app-ddns-go$' "$DDNS_GO_LUCI_DEST/Makefile"
-grep -q '^PKG_NAME:=luci-app-dae-ui$' "$DAE_UI_DEST/Makefile"
+grep -q '^PKG_NAME:=luci-app-dae-ui
+
+grep -q '/etc/ddns-go/ddns-go-config.yaml' "$DDNS_GO_DEST/Makefile"
+grep -q "option port '9876'" "$DDNS_GO_DEST/files/ddns-go.conf"
+
+DAE_VERSION="$(sed -n 's/^PKG_VERSION:=//p' "$DAE_DEST/Makefile" | head -n1)"
+DDNS_GO_VERSION="$(sed -n 's/^PKG_VERSION:=//p' "$DDNS_GO_DEST/Makefile" | head -n1)"
+DDNS_GO_LUCI_VERSION="$(sed -n 's/^PKG_VERSION:=//p' "$DDNS_GO_LUCI_DEST/Makefile" | head -n1)"
+DAE_UI_VERSION="$(sed -n 's/^PKG_VERSION:=//p' "$DAE_UI_DEST/Makefile" | head -n1)"
+KIXDNS_UI_VERSION="$(sed -n 's/^PKG_VERSION:=//p' "$KIXDNS_UI_DEST/Makefile" | head -n1)"
+
+echo "Integrated dae package version: ${DAE_VERSION:-unknown}"
+echo "Integrated ddns-go package version: ${DDNS_GO_VERSION:-unknown}"
+echo "Integrated luci-app-ddns-go version: ${DDNS_GO_LUCI_VERSION:-unknown}"
+echo "Integrated luci-app-dae-ui version: ${DAE_UI_VERSION:-unknown}"
+echo "Integrated luci-app-kixdns-ui version: ${KIXDNS_UI_VERSION:-unknown}"
+echo "Custom source integration completed."
+ "$DAE_UI_DEST/Makefile"
+grep -q '^PKG_NAME:=luci-app-kixdns-ui
+
+grep -q '/etc/ddns-go/ddns-go-config.yaml' "$DDNS_GO_DEST/Makefile"
+grep -q "option port '9876'" "$DDNS_GO_DEST/files/ddns-go.conf"
+
+DAE_VERSION="$(sed -n 's/^PKG_VERSION:=//p' "$DAE_DEST/Makefile" | head -n1)"
+DDNS_GO_VERSION="$(sed -n 's/^PKG_VERSION:=//p' "$DDNS_GO_DEST/Makefile" | head -n1)"
+DDNS_GO_LUCI_VERSION="$(sed -n 's/^PKG_VERSION:=//p' "$DDNS_GO_LUCI_DEST/Makefile" | head -n1)"
+DAE_UI_VERSION="$(sed -n 's/^PKG_VERSION:=//p' "$DAE_UI_DEST/Makefile" | head -n1)"
+
+echo "Integrated dae package version: ${DAE_VERSION:-unknown}"
+echo "Integrated ddns-go package version: ${DDNS_GO_VERSION:-unknown}"
+echo "Integrated luci-app-ddns-go version: ${DDNS_GO_LUCI_VERSION:-unknown}"
+echo "Integrated luci-app-dae-ui version: ${DAE_UI_VERSION:-unknown}"
+echo "Custom source integration completed."
+ "$KIXDNS_UI_DEST/Makefile"
 
 grep -q '/etc/ddns-go/ddns-go-config.yaml' "$DDNS_GO_DEST/Makefile"
 grep -q "option port '9876'" "$DDNS_GO_DEST/files/ddns-go.conf"
