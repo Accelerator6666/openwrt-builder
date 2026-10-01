@@ -12,6 +12,7 @@ A reproducible OpenWrt x86_64 firmware build based on the official OpenWrt sourc
 - DAE core: enabled
 - Custom DAE LuCI UI: enabled
 - DAE GeoIP / Geosite: enabled
+- DDNS-Go: enabled
 
 ## DAE integration
 
@@ -19,12 +20,15 @@ The build keeps third-party inputs pinned in `scripts/sources.lock`.
 
 Current integration:
 
+- DDNS-Go 6.17.6 is compiled into the firmware from the pinned ImmortalWrt package definition. Its own web UI listens on port 9876 when the service is enabled.
+
 - DAE OpenWrt package definition is pinned from `immortalwrt/packages`.
 - That package builds the upstream `daeuniverse/dae` source and installs the OpenWrt procd service.
 - `Accelerator6666/luci-app-dae-ui` is pinned to a specific commit and compiled directly into the firmware.
 - The x86_64 kernel build enables the BPF/BTF options required by dae, including kernel BTF at `/sys/kernel/btf/vmlinux`.
 - The build uses the host LLVM/Clang toolchain for eBPF generation.
 - DAE is installed but remains disabled by default until a valid configuration is supplied and the service is enabled.
+- DDNS-Go is installed but remains disabled by default; enable it after setting provider credentials and access controls.
 
 The custom DAE UI includes persistent binary version selection, reboot-safe dispatch, last-good rollback and validation against the active OpenWrt dae configuration.
 
