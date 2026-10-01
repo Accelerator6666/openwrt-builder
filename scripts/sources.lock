@@ -18,3 +18,10 @@ DDNS_GO_UI_COMMIT="7092e6de6ad9fe3f7d327f70468dfd19e00d6f0e"
 # package/custom/kixdns/Makefile by version and SHA256.
 KIXDNS_UI_REPO="https://github.com/Accelerator6666/luci-app-kixdns-ui.git"
 KIXDNS_UI_COMMIT="4b1ab78dab6e900061567c15977ebe202531e7a2"
+
+
+# Curated extra packages mirrored by QiuSimons/YAOF.
+# This exact commit supplies cpulimit/partexp/einat/xlnetacc/bandix/OAF/
+# ZeroTier LuCI and PassWall support package definitions.
+OPENWRT_ADD_REPO="https://github.com/QiuSimons/OpenWrt-Add.git"
+OPENWRT_ADD_COMMIT="0a652b4edadbea771294c3f1a7782eadce47dd15"
