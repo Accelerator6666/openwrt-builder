@@ -14,6 +14,8 @@ A reproducible OpenWrt x86_64 firmware build based on the official OpenWrt sourc
 - DAE GeoIP / Geosite: enabled
 - DDNS-Go: enabled
 - LuCI DDNS-Go frontend: enabled
+- KixDNS core: enabled
+- Custom KixDNS LuCI UI: enabled
 
 ## DAE integration
 
@@ -35,6 +37,15 @@ Current integration:
 - DDNS-Go is installed but remains disabled by default; enable it after setting provider credentials and access controls.
 
 The custom DAE UI includes persistent binary version selection, reboot-safe dispatch, last-good rollback and validation against the active OpenWrt dae configuration.
+
+## KixDNS integration
+
+- KixDNS 0.2.0 is installed from the upstream x86_64 musl release binary and verified by a pinned SHA256.
+- The default listener is `127.0.0.1:5335` over UDP and TCP.
+- The default upstream is `1.1.1.1:53`; edit `/etc/kixdns/pipeline.json` or use the LuCI UI before relying on it for production routing.
+- `Accelerator6666/luci-app-kixdns-ui` 0.3.0 is pinned to a specific commit and compiled into the firmware.
+- LuCI exposes **Services → KixDNS** with Overview, Visual Editor, Raw JSON, Backups, Diagnostics and Logs.
+- KixDNS configuration is preserved as a conffile at `/etc/kixdns/pipeline.json`.
 
 ## Build
 
