@@ -59,6 +59,21 @@ install_tree() {
 # Utility / system plugins.
 install_tree "imm_pkg/cpulimit" "cpulimit"
 install_tree "luci-app-cpulimit" "luci-app-cpulimit"
+
+# Patch legacy cpulimit LuCI for OpenWrt 25.12. Its UI still uses luasrc/CBI,
+# therefore luci-compat must be an explicit runtime dependency.
+python3 - "$CUSTOM_DIR/luci-app-cpulimit/Makefile" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text()
+old = "LUCI_DEPENDS:=+cpulimit"
+new = "LUCI_DEPENDS:=+cpulimit +luci-compat"
+if old not in text and new not in text:
+    raise SystemExit("Unable to patch luci-app-cpulimit: LUCI_DEPENDS layout changed")
+path.write_text(text.replace(old, new))
+PY
 install_tree "luci-app-partexp/luci-app-partexp" "luci-app-partexp"
 
 # EINAT eBPF.
@@ -111,6 +126,7 @@ install_tree "openwrt_helloworld/v2ray-plugin" "v2ray-plugin"
 
 # Sanity checks: package names must remain what the build config expects.
 grep -q 'PKG_NAME:=luci-app-cpulimit' "$CUSTOM_DIR/luci-app-cpulimit/Makefile"
+grep -q 'luci-compat' "$CUSTOM_DIR/luci-app-cpulimit/Makefile"
 grep -q 'PKG_NAME:=luci-app-partexp' "$CUSTOM_DIR/luci-app-partexp/Makefile"
 grep -q 'PKG_NAME:=einat-ebpf' "$CUSTOM_DIR/einat-ebpf/Makefile"
 grep -q 'luci-app-einat' "$CUSTOM_DIR/luci-app-einat/Makefile"
