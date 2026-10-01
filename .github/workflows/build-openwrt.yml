@@ -151,6 +151,7 @@ jobs:
             CONFIG_KERNEL_DEBUG_INFO_BTF
             CONFIG_KERNEL_XDP_SOCKETS
             CONFIG_KERNEL_DEBUG_FS
+            CONFIG_PACKAGE_luci-compat
 
             CONFIG_PACKAGE_dae
             CONFIG_PACKAGE_dae-geoip
@@ -243,6 +244,39 @@ jobs:
           done
 
           echo "DAE + DDNS-Go + KixDNS + requested YAOF apps preflight checks passed."
+
+          echo "===== Legacy LuCI compatibility checks ====="
+
+          legacy_luci_makefiles=(
+            package/custom/luci-app-cpulimit/Makefile
+            package/custom/luci-app-xlnetacc/Makefile
+            package/custom/luci-app-oaf/Makefile
+            package/custom/luci-app-passwall/Makefile
+          )
+
+          for makefile in "${legacy_luci_makefiles[@]}"; do
+            if ! grep -q 'luci-compat' "$makefile"; then
+              echo "Legacy LuCI package does not depend on luci-compat: $makefile" >&2
+              exit 1
+            fi
+          done
+
+          modern_luci_views=(
+            package/custom/luci-app-partexp/htdocs/luci-static/resources/view
+            feeds/luci/applications/luci-app-sqm/htdocs/luci-static/resources/view
+            package/custom/luci-app-einat/htdocs/luci-static/resources/view
+            package/custom/luci-app-bandix/htdocs/luci-static/resources/view
+            package/custom/luci-app-zerotier/htdocs/luci-static/resources/view
+          )
+
+          for viewdir in "${modern_luci_views[@]}"; do
+            if [ ! -d "$viewdir" ]; then
+              echo "Expected modern LuCI JS view directory is missing: $viewdir" >&2
+              exit 1
+            fi
+          done
+
+          echo "LuCI compatibility checks passed."
 
       - name: Download package sources
         shell: bash
