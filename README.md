@@ -71,3 +71,28 @@ package/custom/      Local OpenWrt packages
 ## Source update policy
 
 Do not follow third-party `main` branches implicitly during a firmware build. Update the commit IDs in `scripts/sources.lock` deliberately, review the changes, then run a new firmware build. This keeps an older firmware reproducible even after upstream repositories change.
+
+
+## Additional LuCI applications
+
+The x86_64 image also includes the following requested applications:
+
+- `luci-app-partexp`
+- `luci-app-cpulimit` + `cpulimit`
+- `luci-app-sqm` + official OpenWrt `sqm-scripts`
+- `luci-app-einat` + `einat-ebpf`
+- `luci-app-xlnetacc`
+- `luci-app-bandix` + `bandix`
+- `luci-app-oaf` + OpenAppFilter userland/kernel components
+- `luci-app-zerotier` + official OpenWrt 25.12 `zerotier`
+- `luci-app-passwall`
+
+The YAOF-derived package definitions are pinned to a specific
+`QiuSimons/OpenWrt-Add` commit in `scripts/sources.lock`. PassWall reuses
+official OpenWrt 25.12 packages when they are available and imports only the
+missing support packages from the pinned YAOF package set. Bandix's x86_64
+release asset is additionally pinned by SHA256.
+
+EINAT and DAE share the BPF/BTF-capable kernel configuration. Because EINAT,
+PassWall and their dependencies substantially increase build work, the GitHub
+Actions job has a five-hour hard timeout.
