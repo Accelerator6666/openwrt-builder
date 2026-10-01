@@ -1,0 +1,8 @@
+# Pinned third-party sources used by scripts/custom.sh.
+# Update these commits deliberately and rebuild to keep firmware reproducible.
+
+IMMORTALWRT_PACKAGES_DAE_REPO="https://github.com/immortalwrt/packages.git"
+IMMORTALWRT_PACKAGES_DAE_COMMIT="6d68ffeb270860be5d73ee2898d58e7c6019d9a4"
+
+DAE_UI_REPO="https://github.com/Accelerator6666/luci-app-dae-ui.git"
+DAE_UI_COMMIT="400afdcccf8cee77578875be022ea1af8a3966de"
