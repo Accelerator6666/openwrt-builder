@@ -1,6 +1,6 @@
 # OpenWrt Builder
 
-A reproducible OpenWrt firmware build repository based on the official OpenWrt source tree.
+A reproducible OpenWrt x86_64 firmware build based on the official OpenWrt source tree.
 
 ## Current target
 
@@ -8,7 +8,25 @@ A reproducible OpenWrt firmware build repository based on the official OpenWrt s
 - Target: x86/64
 - Build host: GitHub Actions / Ubuntu 24.04
 - LuCI: enabled
-- Firmware size: 512 MiB root filesystem
+- Root filesystem: 512 MiB
+- DAE core: enabled
+- Custom DAE LuCI UI: enabled
+- DAE GeoIP / Geosite: enabled
+
+## DAE integration
+
+The build keeps third-party inputs pinned in `scripts/sources.lock`.
+
+Current integration:
+
+- DAE OpenWrt package definition is pinned from `immortalwrt/packages`.
+- That package builds the upstream `daeuniverse/dae` source and installs the OpenWrt procd service.
+- `Accelerator6666/luci-app-dae-ui` is pinned to a specific commit and compiled directly into the firmware.
+- The x86_64 kernel build enables the BPF/BTF options required by dae, including kernel BTF at `/sys/kernel/btf/vmlinux`.
+- The build uses the host LLVM/Clang toolchain for eBPF generation.
+- DAE is installed but remains disabled by default until a valid configuration is supplied and the service is enabled.
+
+The custom DAE UI includes persistent binary version selection, reboot-safe dispatch, last-good rollback and validation against the active OpenWrt dae configuration.
 
 ## Build
 
@@ -16,16 +34,21 @@ A reproducible OpenWrt firmware build repository based on the official OpenWrt s
 2. Select **Build OpenWrt**.
 3. Click **Run workflow**.
 4. Keep `v25.12.5` or enter another valid OpenWrt tag.
-5. Download the firmware artifact after the workflow completes.
+5. Wait for the DAE preflight check and firmware build to complete.
+6. Download the `openwrt-x86_64-...` artifact.
+
+Builds are manual only. Normal pushes do not start a full OpenWrt compilation.
 
 ## Repository layout
 
 ```text
 .github/workflows/   GitHub Actions workflows
 configs/             OpenWrt build configurations
-scripts/             Build customization scripts
+scripts/             Build customization and pinned source definitions
 files/               Files copied into the firmware rootfs
 package/custom/      Local OpenWrt packages
 ```
 
-The first milestone is a clean, reproducible x86_64 build. DAE, KixDNS and the custom LuCI UI can be added after the base build is verified.
+## Source update policy
+
+Do not follow third-party `main` branches implicitly during a firmware build. Update the commit IDs in `scripts/sources.lock` deliberately, review the changes, then run a new firmware build. This keeps an older firmware reproducible even after upstream repositories change.
