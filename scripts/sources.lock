@@ -13,3 +13,8 @@ DAE_UI_COMMIT="400afdcccf8cee77578875be022ea1af8a3966de"
 # ddns-go core package compatible with the LuCI management pages.
 DDNS_GO_UI_REPO="https://github.com/sirpdboy/luci-app-ddns-go.git"
 DDNS_GO_UI_COMMIT="7092e6de6ad9fe3f7d327f70468dfd19e00d6f0e"
+
+# KixDNS LuCI UI. The KixDNS core release binary itself is pinned in
+# package/custom/kixdns/Makefile by version and SHA256.
+KIXDNS_UI_REPO="https://github.com/Accelerator6666/luci-app-kixdns-ui.git"
+KIXDNS_UI_COMMIT="4b1ab78dab6e900061567c15977ebe202531e7a2"
