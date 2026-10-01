@@ -99,7 +99,7 @@ jobs:
           echo "===== diffconfig ====="
           ./scripts/diffconfig.sh
 
-      - name: Verify DAE build configuration
+      - name: Verify custom package configuration
         shell: bash
         run: |
           cd openwrt
@@ -115,6 +115,7 @@ jobs:
             CONFIG_PACKAGE_dae-geosite
             CONFIG_PACKAGE_luci-app-dae-ui
             CONFIG_PACKAGE_ddns-go
+            CONFIG_PACKAGE_luci-app-ddns-go
           )
 
           for symbol in "${required_symbols[@]}"; do
@@ -127,8 +128,9 @@ jobs:
           test -f package/custom/dae/Makefile
           test -f package/custom/luci-app-dae-ui/Makefile
           test -f package/custom/ddns-go/Makefile
+          test -f package/custom/luci-app-ddns-go/Makefile
 
-          echo "DAE preflight checks passed."
+          echo "DAE + DDNS-Go preflight checks passed."
 
       - name: Download package sources
         shell: bash
