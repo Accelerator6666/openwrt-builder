@@ -1,0 +1,37 @@
+{
+  "version": "1.0",
+  "settings": {
+    "min_ttl": 30,
+    "bind_udp": "127.0.0.1:5335",
+    "bind_tcp": "127.0.0.1:5335",
+    "default_upstream": "1.1.1.1:53",
+    "upstream_timeout_ms": 2000,
+    "cache_background_refresh": true,
+    "cache_refresh_threshold_percent": 15,
+    "cache_refresh_min_ttl": 6
+  },
+  "pipeline_select": [],
+  "pipelines": [
+    {
+      "id": "default",
+      "rules": [
+        {
+          "name": "default_forward",
+          "matchers": [
+            {
+              "type": "any"
+            }
+          ],
+          "actions": [
+            {
+              "type": "forward",
+              "upstream": null,
+              "transport": "udp"
+            }
+          ],
+          "response_matchers": []
+        }
+      ]
+    }
+  ]
+}
