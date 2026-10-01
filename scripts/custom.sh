@@ -62,10 +62,10 @@ rm -rf "$DAE_DEST"
 mkdir -p "$DAE_STAGE"
 
 echo "Fetching dae package definition:"
-echo "  repo   : $IMMORTALWRT_PACKAGES_DAE_REPO"
-echo "  commit : $IMMORTALWRT_PACKAGES_DAE_COMMIT"
+echo "  repo   : $IMMORTALWRT_PACKAGES_REPO"
+echo "  commit : $IMMORTALWRT_PACKAGES_COMMIT"
 
-fetch_commit_archive   "$IMMORTALWRT_PACKAGES_DAE_REPO"   "$IMMORTALWRT_PACKAGES_DAE_COMMIT"   "net/dae"   "$DAE_STAGE"   "$TMP_ROOT/immortalwrt-packages"
+fetch_commit_archive   "$IMMORTALWRT_PACKAGES_REPO"   "$IMMORTALWRT_PACKAGES_COMMIT"   "net/dae"   "$DAE_STAGE"   "$TMP_ROOT/immortalwrt-packages"
 
 mkdir -p "$(dirname "$DAE_DEST")"
 mv "$DAE_STAGE/net/dae" "$DAE_DEST"
@@ -80,6 +80,176 @@ else
   exit 1
 fi
 
+# ---------------------------------------------------------------------------
+# DDNS-Go
+#
+# The official OpenWrt 25.12 packages feed does not currently ship ddns-go,
+# so use the same pinned ImmortalWrt packages commit as the dae package.
+# ---------------------------------------------------------------------------
+
+DDNS_GO_DEST="$OPENWRT_DIR/package/custom/ddns-go"
+DDNS_GO_STAGE="$TMP_ROOT/ddns-go-stage"
+
+rm -rf "$DDNS_GO_DEST"
+mkdir -p "$DDNS_GO_STAGE"
+
+echo "Fetching ddns-go package definition:"
+echo "  repo   : $IMMORTALWRT_PACKAGES_REPO"
+echo "  commit : $IMMORTALWRT_PACKAGES_COMMIT"
+
+fetch_commit_archive \
+  "$IMMORTALWRT_PACKAGES_REPO" \
+  "$IMMORTALWRT_PACKAGES_COMMIT" \
+  "net/ddns-go" \
+  "$DDNS_GO_STAGE" \
+  "$TMP_ROOT/immortalwrt-ddns-go"
+
+mkdir -p "$(dirname "$DDNS_GO_DEST")"
+mv "$DDNS_GO_STAGE/net/ddns-go" "$DDNS_GO_DEST"
+
+if grep -q '^include ../../lang/golang/golang-package.mk
+DAE_UI_DEST="$OPENWRT_DIR/package/custom/luci-app-dae-ui"
+
+rm -rf "$DAE_UI_DEST"
+
+echo "Fetching custom DAE LuCI UI:"
+echo "  repo   : $DAE_UI_REPO"
+echo "  commit : $DAE_UI_COMMIT"
+
+fetch_commit_archive   "$DAE_UI_REPO"   "$DAE_UI_COMMIT"   ""   "$DAE_UI_DEST"   "$TMP_ROOT/dae-ui"
+
+# ---------------------------------------------------------------------------
+# Sanity checks
+# ---------------------------------------------------------------------------
+
+grep -q '^PKG_NAME:=dae
+ "$DDNS_GO_DEST/Makefile"; then
+  sed -i \
+    's#include ../../lang/golang/golang-package.mk#include $(TOPDIR)/feeds/packages/lang/golang/golang-package.mk#' \
+    "$DDNS_GO_DEST/Makefile"
+else
+  echo "Unexpected ddns-go Makefile layout; refusing to build an unverified package definition." >&2
+  exit 1
+fi
+# ---------------------------------------------------------------------------
+# Custom LuCI DAE UI
+# ---------------------------------------------------------------------------
+
+DAE_UI_DEST="$OPENWRT_DIR/package/custom/luci-app-dae-ui"
+
+rm -rf "$DAE_UI_DEST"
+
+echo "Fetching custom DAE LuCI UI:"
+echo "  repo   : $DAE_UI_REPO"
+echo "  commit : $DAE_UI_COMMIT"
+
+fetch_commit_archive   "$DAE_UI_REPO"   "$DAE_UI_COMMIT"   ""   "$DAE_UI_DEST"   "$TMP_ROOT/dae-ui"
+
+# ---------------------------------------------------------------------------
+# Sanity checks
+# ---------------------------------------------------------------------------
+
+grep -q '^PKG_NAME:=dae$' "$DAE_DEST/Makefile"
+grep -q '^PKG_NAME:=luci-app-dae-ui$' "$DAE_UI_DEST/Makefile"
+
+DAE_VERSION="$(sed -n 's/^PKG_VERSION:=//p' "$DAE_DEST/Makefile" | head -n1)"
+DAE_UI_VERSION="$(sed -n 's/^PKG_VERSION:=//p' "$DAE_UI_DEST/Makefile" | head -n1)"
+
+echo "Integrated dae package version: ${DAE_VERSION:-unknown}"
+echo "Integrated luci-app-dae-ui version: ${DAE_UI_VERSION:-unknown}"
+echo "Custom source integration completed."
+ "$DAE_DEST/Makefile"
+grep -q '^PKG_NAME:=ddns-go
+ "$DDNS_GO_DEST/Makefile"; then
+  sed -i \
+    's#include ../../lang/golang/golang-package.mk#include $(TOPDIR)/feeds/packages/lang/golang/golang-package.mk#' \
+    "$DDNS_GO_DEST/Makefile"
+else
+  echo "Unexpected ddns-go Makefile layout; refusing to build an unverified package definition." >&2
+  exit 1
+fi
+# ---------------------------------------------------------------------------
+# Custom LuCI DAE UI
+# ---------------------------------------------------------------------------
+
+DAE_UI_DEST="$OPENWRT_DIR/package/custom/luci-app-dae-ui"
+
+rm -rf "$DAE_UI_DEST"
+
+echo "Fetching custom DAE LuCI UI:"
+echo "  repo   : $DAE_UI_REPO"
+echo "  commit : $DAE_UI_COMMIT"
+
+fetch_commit_archive   "$DAE_UI_REPO"   "$DAE_UI_COMMIT"   ""   "$DAE_UI_DEST"   "$TMP_ROOT/dae-ui"
+
+# ---------------------------------------------------------------------------
+# Sanity checks
+# ---------------------------------------------------------------------------
+
+grep -q '^PKG_NAME:=dae$' "$DAE_DEST/Makefile"
+grep -q '^PKG_NAME:=luci-app-dae-ui$' "$DAE_UI_DEST/Makefile"
+
+DAE_VERSION="$(sed -n 's/^PKG_VERSION:=//p' "$DAE_DEST/Makefile" | head -n1)"
+DAE_UI_VERSION="$(sed -n 's/^PKG_VERSION:=//p' "$DAE_UI_DEST/Makefile" | head -n1)"
+
+echo "Integrated dae package version: ${DAE_VERSION:-unknown}"
+echo "Integrated luci-app-dae-ui version: ${DAE_UI_VERSION:-unknown}"
+echo "Custom source integration completed."
+ "$DDNS_GO_DEST/Makefile"
+grep -q '^PKG_NAME:=luci-app-dae-ui
+ "$DDNS_GO_DEST/Makefile"; then
+  sed -i \
+    's#include ../../lang/golang/golang-package.mk#include $(TOPDIR)/feeds/packages/lang/golang/golang-package.mk#' \
+    "$DDNS_GO_DEST/Makefile"
+else
+  echo "Unexpected ddns-go Makefile layout; refusing to build an unverified package definition." >&2
+  exit 1
+fi
+# ---------------------------------------------------------------------------
+# Custom LuCI DAE UI
+# ---------------------------------------------------------------------------
+
+DAE_UI_DEST="$OPENWRT_DIR/package/custom/luci-app-dae-ui"
+
+rm -rf "$DAE_UI_DEST"
+
+echo "Fetching custom DAE LuCI UI:"
+echo "  repo   : $DAE_UI_REPO"
+echo "  commit : $DAE_UI_COMMIT"
+
+fetch_commit_archive   "$DAE_UI_REPO"   "$DAE_UI_COMMIT"   ""   "$DAE_UI_DEST"   "$TMP_ROOT/dae-ui"
+
+# ---------------------------------------------------------------------------
+# Sanity checks
+# ---------------------------------------------------------------------------
+
+grep -q '^PKG_NAME:=dae$' "$DAE_DEST/Makefile"
+grep -q '^PKG_NAME:=luci-app-dae-ui$' "$DAE_UI_DEST/Makefile"
+
+DAE_VERSION="$(sed -n 's/^PKG_VERSION:=//p' "$DAE_DEST/Makefile" | head -n1)"
+DAE_UI_VERSION="$(sed -n 's/^PKG_VERSION:=//p' "$DAE_UI_DEST/Makefile" | head -n1)"
+
+echo "Integrated dae package version: ${DAE_VERSION:-unknown}"
+echo "Integrated luci-app-dae-ui version: ${DAE_UI_VERSION:-unknown}"
+echo "Custom source integration completed."
+ "$DAE_UI_DEST/Makefile"
+
+DAE_VERSION="$(sed -n 's/^PKG_VERSION:=//p' "$DAE_DEST/Makefile" | head -n1)"
+DDNS_GO_VERSION="$(sed -n 's/^PKG_VERSION:=//p' "$DDNS_GO_DEST/Makefile" | head -n1)"
+DAE_UI_VERSION="$(sed -n 's/^PKG_VERSION:=//p' "$DAE_UI_DEST/Makefile" | head -n1)"
+
+echo "Integrated dae package version: ${DAE_VERSION:-unknown}"
+echo "Integrated ddns-go package version: ${DDNS_GO_VERSION:-unknown}"
+echo "Integrated luci-app-dae-ui version: ${DAE_UI_VERSION:-unknown}"
+echo "Custom source integration completed."
+ "$DDNS_GO_DEST/Makefile"; then
+  sed -i \
+    's#include ../../lang/golang/golang-package.mk#include $(TOPDIR)/feeds/packages/lang/golang/golang-package.mk#' \
+    "$DDNS_GO_DEST/Makefile"
+else
+  echo "Unexpected ddns-go Makefile layout; refusing to build an unverified package definition." >&2
+  exit 1
+fi
 # ---------------------------------------------------------------------------
 # Custom LuCI DAE UI
 # ---------------------------------------------------------------------------
