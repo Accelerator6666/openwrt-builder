@@ -96,3 +96,24 @@ release asset is additionally pinned by SHA256.
 EINAT and DAE share the BPF/BTF-capable kernel configuration. Because EINAT,
 PassWall and their dependencies substantially increase build work, the GitHub
 Actions job has a five-hour hard timeout.
+
+
+## LuCI 25.12 compatibility
+
+The requested LuCI applications are checked against the OpenWrt 25.12 LuCI architecture.
+
+| Package | UI architecture | Compatibility handling |
+| --- | --- | --- |
+| luci-app-partexp | Modern JavaScript + menu.d + rpcd ACL | Native |
+| luci-app-sqm | Official modern JavaScript LuCI | Native |
+| luci-app-einat | Modern JavaScript + menu.d + rpcd ucode | Native |
+| luci-app-bandix | Modern JavaScript + menu.d + rpcd | Native |
+| luci-app-zerotier | Modern JavaScript + menu.d + rpcd ACL | Native |
+| luci-app-cpulimit | Legacy Lua/CBI | Explicit luci-compat dependency added during integration |
+| luci-app-xlnetacc | Legacy Lua/CBI | Upstream package already depends on luci-compat |
+| luci-app-oaf | Legacy Lua/CBI | Upstream package already depends on luci-compat |
+| luci-app-passwall | Hybrid Lua/CBI + JavaScript | Upstream package already depends on luci-compat |
+
+The build explicitly enables `CONFIG_PACKAGE_luci-compat=y` and fails its
+preflight if a known legacy LuCI package loses the `luci-compat` dependency
+or if a modern package loses its JavaScript view directory.
