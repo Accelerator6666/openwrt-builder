@@ -7,16 +7,6 @@ on:
         description: "OpenWrt tag or branch"
         required: true
         default: "v25.12.5"
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/**"
-      - "configs/**"
-      - "scripts/**"
-      - "files/**"
-      - "package/**"
-
 permissions:
   contents: read
 
