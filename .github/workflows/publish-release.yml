@@ -51,6 +51,24 @@ jobs:
         run: |
           set -euo pipefail
 
+          if [ "$GITHUB_EVENT_NAME" = "workflow_run" ]; then
+            SOURCE_RUN_ID="$(jq -r '.workflow_run.id' "$GITHUB_EVENT_PATH")"
+            REQUESTED_TAG=""
+            REQUESTED_TITLE=""
+
+            artifacts_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts?per_page=100")"
+            artifact_name="$(jq -r '.artifacts[].name | select(startswith("openwrt-x86_64-"))' <<<"$artifacts_json" | head -n1)"
+
+            if [ -z "$artifact_name" ]; then
+              echo "No OpenWrt x86_64 firmware artifact was found for run $SOURCE_RUN_ID." >&2
+              exit 1
+            fi
+
+            OPENWRT_REF="${artifact_name#openwrt-x86_64-}"
+          else
+            artifact_name="openwrt-x86_64-${OPENWRT_REF}"
+          fi
+
           run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID")"
           status="$(jq -r '.status' <<<"$run_json")"
           conclusion="$(jq -r '.conclusion' <<<"$run_json")"
@@ -67,12 +85,12 @@ jobs:
           safe_ref="${OPENWRT_REF//\//-}"
           release_tag="${REQUESTED_TAG:-${safe_ref}-x86_64-r${run_number}}"
           release_title="${REQUESTED_TITLE:-OpenWrt ${OPENWRT_REF} x86_64 Custom Build (r${run_number})}"
-          artifact_name="openwrt-x86_64-${OPENWRT_REF}"
-
           {
+            echo "SOURCE_RUN_ID=$SOURCE_RUN_ID"
             echo "SOURCE_RUN_NUMBER=$run_number"
             echo "SOURCE_HEAD_SHA=$head_sha"
             echo "SOURCE_EVENT=$event"
+            echo "OPENWRT_REF=$OPENWRT_REF"
             echo "ARTIFACT_NAME=$artifact_name"
             echo "RELEASE_TAG=$release_tag"
             echo "RELEASE_TITLE=$release_title"
