@@ -141,8 +141,9 @@ jobs:
           Build provenance:
           - Build workflow run: #${SOURCE_RUN_NUMBER}
           - Build run ID: ${SOURCE_RUN_ID}
-          - Builder commit: ${SOURCE_HEAD_SHA}
+          - Builder commit used for firmware: ${SOURCE_HEAD_SHA}
           - Firmware artifact: ${ARTIFACT_NAME}
+          - Release tag tracks the current builder repository state; firmware provenance is the build run and builder commit above.
 
           Included custom integrations:
           - DAE + luci-app-dae-ui
@@ -195,8 +196,7 @@ jobs:
             gh release create "$RELEASE_TAG" \
               --repo "$GITHUB_REPOSITORY" \
               --title "$RELEASE_TITLE" \
-              --notes-file release-notes.md \
-              --target "$SOURCE_HEAD_SHA"
+              --notes-file release-notes.md
           fi
 
           gh release upload "$RELEASE_TAG" release-assets/* \
