@@ -34,18 +34,18 @@ copy_with_unique_name() {
 while IFS= read -r -d '' file; do
   copy_with_unique_name "$file"
 done < <(
-  find "$SOURCE_ROOT" -type f \(
-    -name '*-combined*.img.gz' -o
-    -name '*-rootfs*.img.gz' -o
-    -name '*-targz-rootfs.tar.gz' -o
-    -name 'rootfs.tar.gz' -o
-    -name '*-kernel.bin' -o
-    -name '*.manifest' -o
-    -name '*.bom.cdx.json' -o
-    -name 'profiles.json' -o
-    -name 'config.buildinfo' -o
-    -name 'feeds.buildinfo' -o
-    -name 'version.buildinfo'
+  find "$SOURCE_ROOT" -type f \( \
+    -name '*-combined*.img.gz' -o \
+    -name '*-rootfs*.img.gz' -o \
+    -name '*-targz-rootfs.tar.gz' -o \
+    -name 'rootfs.tar.gz' -o \
+    -name '*-kernel.bin' -o \
+    -name '*.manifest' -o \
+    -name '*.bom.cdx.json' -o \
+    -name 'profiles.json' -o \
+    -name 'config.buildinfo' -o \
+    -name 'feeds.buildinfo' -o \
+    -name 'version.buildinfo' \
   \) -print0
 )
 
