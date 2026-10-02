@@ -30,6 +30,9 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
+      - name: Checkout publisher scripts
+        uses: actions/checkout@v4
+
       - name: Resolve source build
         shell: bash
         env:
@@ -77,10 +80,29 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           name: ${{ env.ARTIFACT_NAME }}
-          path: release-assets
+          path: artifact-source
           repository: ${{ github.repository }}
           run-id: ${{ github.event.inputs.run_id }}
           github-token: ${{ github.token }}
+
+      - name: Prepare release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -rf release-assets
+
+          # Newer build runs already upload a flat, release-ready artifact.
+          # Older successful runs preserve OpenWrt's original directory tree.
+          if find artifact-source -maxdepth 1 -type f -name '*-combined*.img.gz' -print -quit | grep -q . \
+             && [ -f artifact-source/SHA256SUMS ]; then
+            mkdir -p release-assets
+            cp -a artifact-source/. release-assets/
+            echo "Artifact is already release-ready."
+          else
+            chmod +x scripts/prepare-release-assets.sh
+            ./scripts/prepare-release-assets.sh artifact-source release-assets
+          fi
 
       - name: Validate release assets
         shell: bash
