@@ -1,0 +1,174 @@
+name: Publish OpenWrt Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: "Successful Build OpenWrt run ID"
+        required: true
+        type: string
+      openwrt_ref:
+        description: "OpenWrt tag used by the source build"
+        required: true
+        default: "v25.12.5"
+        type: string
+      release_tag:
+        description: "Optional release tag; blank uses <openwrt_ref>-x86_64-r<run_number>"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    name: Publish x86_64 firmware
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout builder repository
+        uses: actions/checkout@v4
+
+      - name: Validate source build
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          OPENWRT_REF: ${{ inputs.openwrt_ref }}
+          RELEASE_TAG_INPUT: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+
+          run_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SOURCE_RUN_ID}")"
+          status="$(jq -r .status <<<"$run_json")"
+          conclusion="$(jq -r .conclusion <<<"$run_json")"
+          source_sha="$(jq -r .head_sha <<<"$run_json")"
+          source_run_number="$(jq -r .run_number <<<"$run_json")"
+
+          if [ "$status" != "completed" ] || [ "$conclusion" != "success" ]; then
+            echo "Source run ${SOURCE_RUN_ID} is not a successful completed build: status=${status}, conclusion=${conclusion}" >&2
+            exit 1
+          fi
+
+          artifact_name="openwrt-x86_64-${OPENWRT_REF}"
+          if [ -n "$RELEASE_TAG_INPUT" ]; then
+            release_tag="$RELEASE_TAG_INPUT"
+          else
+            release_tag="${OPENWRT_REF}-x86_64-r${source_run_number}"
+          fi
+          release_title="OpenWrt ${OPENWRT_REF} x86_64 custom r${source_run_number}"
+
+          echo "SOURCE_SHA=$source_sha" >> "$GITHUB_ENV"
+          echo "SOURCE_RUN_NUMBER=$source_run_number" >> "$GITHUB_ENV"
+          echo "ARTIFACT_NAME=$artifact_name" >> "$GITHUB_ENV"
+          echo "RELEASE_TAG=$release_tag" >> "$GITHUB_ENV"
+          echo "RELEASE_TITLE=$release_title" >> "$GITHUB_ENV"
+
+          echo "Source run: ${SOURCE_RUN_ID}"
+          echo "Source commit: ${source_sha}"
+          echo "Artifact: ${artifact_name}"
+          echo "Release tag: ${release_tag}"
+
+      - name: Download successful firmware artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          rm -rf source-artifact
+          mkdir -p source-artifact
+          gh run download "$SOURCE_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "$ARTIFACT_NAME" \
+            --dir source-artifact
+
+          echo "Downloaded artifact contents:"
+          find source-artifact -type f -printf '%p\t%s bytes\n' | sort
+
+      - name: Prepare release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x scripts/prepare-release-assets.sh
+          ./scripts/prepare-release-assets.sh source-artifact release-assets
+
+      - name: Create release notes
+        shell: bash
+        env:
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          OPENWRT_REF: ${{ inputs.openwrt_ref }}
+        run: |
+          set -euo pipefail
+
+          {
+            echo "# ${RELEASE_TITLE}"
+            echo
+            echo "Custom OpenWrt x86_64 firmware built from official OpenWrt ${OPENWRT_REF}."
+            echo
+            echo "Source GitHub Actions run: ${SOURCE_RUN_ID}"
+            echo "Builder commit: ${SOURCE_SHA}"
+            echo
+            echo "## Image selection"
+            echo
+            echo "- UEFI: use the squashfs-combined-efi image for the normal recommended installation."
+            echo "- Legacy BIOS: use the squashfs-combined image."
+            echo "- ext4-combined variants are provided when an ext4 root filesystem is preferred."
+            echo "- Rootfs-only images and kernel.bin are intended for advanced/manual deployment."
+            echo
+            echo "Keep the same boot mode and filesystem family when upgrading unless you are intentionally migrating. Back up the configuration first."
+            echo
+            echo "Verify downloads with SHA256SUMS before flashing."
+            echo
+            echo "## Included firmware files"
+            echo
+            find release-assets -maxdepth 1 -type f \(
+              -name '*-combined*.img.gz' -o
+              -name '*-rootfs*.img.gz' -o
+              -name '*-targz-rootfs.tar.gz' -o
+              -name 'rootfs.tar.gz' -o
+              -name '*-kernel.bin'
+            \) -printf '- %f\n' | sort
+            echo
+            echo "Build metadata, manifest/profile information, IMAGE_GUIDE.txt and SHA256SUMS are attached as well."
+          } > release-notes.md
+
+          cat release-notes.md
+
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release ${RELEASE_TAG} already exists; updating notes and replacing assets."
+            gh release edit "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$RELEASE_TITLE" \
+              --notes-file release-notes.md
+            gh release upload "$RELEASE_TAG" release-assets/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --clobber
+          else
+            gh release create "$RELEASE_TAG" release-assets/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$SOURCE_SHA" \
+              --title "$RELEASE_TITLE" \
+              --notes-file release-notes.md
+          fi
+
+          release_url="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}"
+          echo "Release published: ${release_url}"
+          {
+            echo "### Release published"
+            echo
+            echo "- Tag: ${RELEASE_TAG}"
+            echo "- Source run: ${{ inputs.source_run_id }}"
+            echo "- Source commit: ${SOURCE_SHA}"
+            echo "- URL: ${release_url}"
+          } >> "$GITHUB_STEP_SUMMARY"
