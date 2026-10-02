@@ -7,18 +7,18 @@ on:
         description: "Successful Build OpenWrt workflow run ID"
         required: true
         default: "36970085668"
-      artifact_name:
-        description: "Artifact name produced by the build workflow"
+      openwrt_ref:
+        description: "OpenWrt ref used by the successful build"
         required: true
-        default: "openwrt-x86_64-v25.12.5"
+        default: "v25.12.5"
       tag:
-        description: "GitHub Release tag"
-        required: true
-        default: "openwrt-v25.12.5-custom-20261002"
+        description: "Optional release tag; leave blank for an automatic tag"
+        required: false
+        default: ""
       title:
-        description: "GitHub Release title"
-        required: true
-        default: "OpenWrt v25.12.5 x86_64 Custom Build"
+        description: "Optional release title; leave blank for an automatic title"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -30,69 +30,97 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
+      - name: Resolve source build
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ github.event.inputs.run_id }}
+          OPENWRT_REF: ${{ github.event.inputs.openwrt_ref }}
+          REQUESTED_TAG: ${{ github.event.inputs.tag }}
+          REQUESTED_TITLE: ${{ github.event.inputs.title }}
+        run: |
+          set -euo pipefail
+
+          run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID")"
+          status="$(jq -r '.status' <<<"$run_json")"
+          conclusion="$(jq -r '.conclusion' <<<"$run_json")"
+          run_number="$(jq -r '.run_number' <<<"$run_json")"
+          head_sha="$(jq -r '.head_sha' <<<"$run_json")"
+          event="$(jq -r '.event' <<<"$run_json")"
+
+          if [ "$status" != "completed" ] || [ "$conclusion" != "success" ]; then
+            echo "Source workflow run $SOURCE_RUN_ID is not a successful completed run." >&2
+            echo "status=$status conclusion=$conclusion" >&2
+            exit 1
+          fi
+
+          safe_ref="${OPENWRT_REF//\//-}"
+          release_tag="${REQUESTED_TAG:-${safe_ref}-x86_64-r${run_number}}"
+          release_title="${REQUESTED_TITLE:-OpenWrt ${OPENWRT_REF} x86_64 Custom Build (r${run_number})}"
+          artifact_name="openwrt-x86_64-${OPENWRT_REF}"
+
+          {
+            echo "SOURCE_RUN_NUMBER=$run_number"
+            echo "SOURCE_HEAD_SHA=$head_sha"
+            echo "SOURCE_EVENT=$event"
+            echo "ARTIFACT_NAME=$artifact_name"
+            echo "RELEASE_TAG=$release_tag"
+            echo "RELEASE_TITLE=$release_title"
+          } >> "$GITHUB_ENV"
+
+          echo "Source run: $SOURCE_RUN_ID (#$run_number)"
+          echo "Source commit: $head_sha"
+          echo "Artifact: $artifact_name"
+          echo "Release tag: $release_tag"
+
       - name: Download firmware artifact
         uses: actions/download-artifact@v5
         with:
-          name: ${{ github.event.inputs.artifact_name }}
-          path: release-input
+          name: ${{ env.ARTIFACT_NAME }}
+          path: release-assets
           repository: ${{ github.repository }}
           run-id: ${{ github.event.inputs.run_id }}
           github-token: ${{ github.token }}
 
-      - name: Inspect downloaded files
-        shell: bash
-        run: |
-          echo "===== Downloaded artifact ====="
-          find release-input -maxdepth 4 -type f -printf '%p\t%k KB\n' | sort
-
-      - name: Prepare release assets
+      - name: Validate release assets
         shell: bash
         run: |
           set -euo pipefail
 
-          mkdir -p release-assets
+          echo "===== Release assets ====="
+          find release-assets -maxdepth 1 -type f -printf '%f\t%s bytes\n' | sort
 
-          # Firmware images and standard OpenWrt metadata.
-          find release-input -type f \( \
-            -name '*.img.gz' -o \
-            -name '*.img' -o \
-            -name '*rootfs*.tar.gz' -o \
-            -name '*.manifest' -o \
-            -name 'profiles.json' -o \
-            -name 'sha256sums' -o \
-            -name '*.buildinfo' \
-          \) -exec cp -a {} release-assets/ \;
-
-          # Preserve our custom build metadata as clearly named assets.
-          if [ -f release-input/build.txt ]; then
-            cp release-input/build.txt release-assets/custom-build.txt
-          fi
-          if [ -f release-input/diffconfig.txt ]; then
-            cp release-input/diffconfig.txt release-assets/custom-diffconfig.txt
-          fi
-          if [ -f release-input/openwrt.config ]; then
-            cp release-input/openwrt.config release-assets/custom-openwrt.config
-          fi
-
-          if ! find release-assets -maxdepth 1 -type f | grep -q .; then
-            echo "No release assets were found." >&2
+          if ! find release-assets -maxdepth 1 -type f -name '*-combined*.img.gz' -print -quit | grep -q .; then
+            echo "No combined x86_64 firmware image found in artifact." >&2
             exit 1
           fi
 
-          echo "===== Release assets ====="
-          ls -lh release-assets
+          if [ ! -f release-assets/SHA256SUMS ]; then
+            echo "SHA256SUMS is missing from the release-ready artifact." >&2
+            exit 1
+          fi
+
+          (
+            cd release-assets
+            sha256sum -c SHA256SUMS
+          )
 
       - name: Generate release notes
         shell: bash
         env:
-          RUN_ID: ${{ github.event.inputs.run_id }}
-          ARTIFACT_NAME: ${{ github.event.inputs.artifact_name }}
+          SOURCE_RUN_ID: ${{ github.event.inputs.run_id }}
+          OPENWRT_REF: ${{ github.event.inputs.openwrt_ref }}
         run: |
-          cat > release-notes.md <<EOF
-          Custom OpenWrt x86_64 build based on OpenWrt v25.12.5.
+          set -euo pipefail
 
-          Build workflow run: #${RUN_ID}
-          Artifact: ${ARTIFACT_NAME}
+          cat > release-notes.md <<EOF
+          Custom OpenWrt x86_64 firmware based on **OpenWrt ${OPENWRT_REF}**.
+
+          Build provenance:
+          - Build workflow run: #${SOURCE_RUN_NUMBER}
+          - Build run ID: ${SOURCE_RUN_ID}
+          - Builder commit: ${SOURCE_HEAD_SHA}
+          - Firmware artifact: ${ARTIFACT_NAME}
 
           Included custom integrations:
           - DAE + luci-app-dae-ui
@@ -108,33 +136,48 @@ jobs:
           - PartExp
           - XLNetAcc
 
-          The release includes firmware images, OpenWrt metadata, checksums, manifests,
-          and the custom build configuration when present.
+          Recommended image selection:
+          - UEFI + squashfs: *-squashfs-combined-efi.img.gz
+          - Legacy BIOS + squashfs: *-squashfs-combined.img.gz
+          - UEFI + ext4: *-ext4-combined-efi.img.gz
+          - Legacy BIOS + ext4: *-ext4-combined.img.gz
+
+          For upgrades, keep the existing boot mode and filesystem family unless deliberately migrating.
+          Back up the configuration first and verify the selected file against SHA256SUMS.
           EOF
+
+          if [ -f release-assets/IMAGE_GUIDE.txt ]; then
+            {
+              echo
+              echo '### Image guide'
+              echo
+              echo '```text'
+              cat release-assets/IMAGE_GUIDE.txt
+              echo '```'
+            } >> release-notes.md
+          fi
 
       - name: Create or update GitHub Release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.event.inputs.tag }}
-          TITLE: ${{ github.event.inputs.title }}
         run: |
           set -euo pipefail
 
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release edit "$TAG" \
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" \
               --repo "$GITHUB_REPOSITORY" \
-              --title "$TITLE" \
+              --title "$RELEASE_TITLE" \
               --notes-file release-notes.md
           else
-            gh release create "$TAG" \
+            gh release create "$RELEASE_TAG" \
               --repo "$GITHUB_REPOSITORY" \
-              --title "$TITLE" \
+              --title "$RELEASE_TITLE" \
               --notes-file release-notes.md \
-              --target "$GITHUB_SHA"
+              --target "$SOURCE_HEAD_SHA"
           fi
 
-          gh release upload "$TAG" release-assets/* \
+          gh release upload "$RELEASE_TAG" release-assets/* \
             --repo "$GITHUB_REPOSITORY" \
             --clobber
 
@@ -142,6 +185,6 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.event.inputs.tag }}
         run: |
-          gh release view "$TAG" --repo "$GITHUB_REPOSITORY"
+          set -euo pipefail
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY"
