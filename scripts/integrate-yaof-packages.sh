@@ -106,6 +106,25 @@ install_tree "OpenAppFilter/oaf" "oaf"
 install_tree "OpenAppFilter/open-app-filter" "open-app-filter"
 install_tree "OpenAppFilter/luci-app-oaf" "luci-app-oaf"
 
+# Linux 6.12 enables -Werror=missing-declarations for external modules.
+# OpenAppFilter 6.1.6 has a number of translation-unit local helpers without
+# header declarations. They are valid for this module, so suppress only that
+# diagnostic instead of weakening the kernel build globally.
+python3 - "$CUSTOM_DIR/oaf/Makefile" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text()
+old = "-Wno-unused-variable -Wno-unused-function -Wno-missing-prototypes \\\n"
+new = "-Wno-unused-variable -Wno-unused-function -Wno-missing-prototypes -Wno-missing-declarations \\\n"
+if new not in text:
+    if old not in text:
+        raise SystemExit("Unable to patch OpenAppFilter: EXTRA_CFLAGS layout changed")
+    text = text.replace(old, new, 1)
+path.write_text(text)
+PY
+
 # ZeroTier LuCI only. The zerotier core comes from the official OpenWrt 25.12
 # packages feed to avoid duplicating the same package name.
 install_tree "luci-app-zerotier" "luci-app-zerotier"
@@ -134,6 +153,7 @@ grep -q 'PKG_NAME:=luci-app-xlnetacc' "$CUSTOM_DIR/luci-app-xlnetacc/Makefile"
 grep -q 'PKG_NAME:=bandix' "$CUSTOM_DIR/bandix/Makefile"
 grep -q 'LUCI_TITLE:=LuCI Bandix app for network traffic monitoring' "$CUSTOM_DIR/luci-app-bandix/Makefile"
 grep -q 'KernelPackage/oaf' "$CUSTOM_DIR/oaf/Makefile"
+grep -q 'Wno-missing-declarations' "$CUSTOM_DIR/oaf/Makefile"
 grep -q 'PKG_NAME:=appfilter' "$CUSTOM_DIR/open-app-filter/Makefile"
 grep -q 'PKG_NAME:=luci-app-oaf' "$CUSTOM_DIR/luci-app-oaf/Makefile"
 grep -q 'LuCI for Zerotier' "$CUSTOM_DIR/luci-app-zerotier/Makefile"
