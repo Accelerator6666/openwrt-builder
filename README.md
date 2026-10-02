@@ -58,6 +58,50 @@ The custom DAE UI includes persistent binary version selection, reboot-safe disp
 
 Builds are manual only. Normal pushes do not start a full OpenWrt compilation.
 
+The firmware artifact is release-ready and intentionally excludes package repositories,
+SDK/toolchain archives, kernel debug archives and kmods. It keeps the flashable x86_64
+images, manifest/profile/build metadata, the effective OpenWrt configuration and a
+fresh `SHA256SUMS` file.
+
+## Publish a GitHub Release
+
+A successful build can be published without rebuilding it. Run the
+`Publish OpenWrt Release` workflow and provide the successful build run ID.
+
+Example:
+
+```powershell
+gh workflow run publish-release.yml `
+  --repo Accelerator6666/openwrt-builder `
+  --ref main `
+  -f source_run_id=<successful-run-id> `
+  -f openwrt_ref=v25.12.5
+```
+
+The default release tag is:
+
+```text
+v25.12.5-x86_64-r<build-run-number>
+```
+
+The release workflow verifies that the source run completed successfully, downloads
+its firmware artifact, discards non-firmware payloads, regenerates checksums and then
+creates or updates the GitHub Release.
+
+### x86_64 image selection
+
+| Boot/filesystem | Image | Typical use |
+| --- | --- | --- |
+| UEFI + squashfs | `*-squashfs-combined-efi.img.gz` | Recommended normal installation on modern x86_64 hardware |
+| Legacy BIOS + squashfs | `*-squashfs-combined.img.gz` | Recommended normal installation on legacy BIOS systems |
+| UEFI + ext4 | `*-ext4-combined-efi.img.gz` | UEFI installation when an ext4 root filesystem is preferred |
+| Legacy BIOS + ext4 | `*-ext4-combined.img.gz` | Legacy BIOS installation when an ext4 root filesystem is preferred |
+
+Rootfs-only images and `kernel.bin` are retained for advanced/manual deployment.
+For upgrades, keep the existing boot mode and filesystem family unless deliberately
+migrating, back up the configuration first, and verify the selected image against
+`SHA256SUMS`.
+
 ## Repository layout
 
 ```text
