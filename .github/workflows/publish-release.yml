@@ -107,7 +107,7 @@ jobs:
           name: ${{ env.ARTIFACT_NAME }}
           path: artifact-source
           repository: ${{ github.repository }}
-          run-id: ${{ github.event.inputs.run_id }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
           github-token: ${{ github.token }}
 
       - name: Prepare release assets
@@ -154,9 +154,6 @@ jobs:
 
       - name: Generate release notes
         shell: bash
-        env:
-          SOURCE_RUN_ID: ${{ github.event.inputs.run_id }}
-          OPENWRT_REF: ${{ github.event.inputs.openwrt_ref }}
         run: |
           set -euo pipefail
 
