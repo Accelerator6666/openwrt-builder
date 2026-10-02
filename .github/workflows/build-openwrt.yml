@@ -317,14 +317,27 @@ jobs:
             ) > build-info/diffconfig.txt || true
           fi
 
+      - name: Prepare firmware artifact
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -rf artifact-source firmware-artifact
+          mkdir -p artifact-source/target artifact-source/build-info
+
+          cp -a openwrt/bin/targets/x86/64/. artifact-source/target/
+          cp -a build-info/. artifact-source/build-info/
+
+          chmod +x scripts/prepare-release-assets.sh
+          ./scripts/prepare-release-assets.sh artifact-source firmware-artifact
+
       - name: Upload firmware
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: openwrt-x86_64-${{ env.OPENWRT_REF }}
-          path: |
-            openwrt/bin/targets/x86/64/*
-            build-info/*
+          path: firmware-artifact/*
           if-no-files-found: error
           retention-days: 30
 
