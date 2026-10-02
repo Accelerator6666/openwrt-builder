@@ -7,7 +7,7 @@ IMMORTALWRT_PACKAGES_REPO="https://github.com/immortalwrt/packages.git"
 IMMORTALWRT_PACKAGES_COMMIT="6d68ffeb270860be5d73ee2898d58e7c6019d9a4"
 
 DAE_UI_REPO="https://github.com/Accelerator6666/luci-app-dae-ui.git"
-DAE_UI_COMMIT="400afdcccf8cee77578875be022ea1af8a3966de"
+DAE_UI_COMMIT="46a0695baa419a5ebc74ea794bb7315f59f91118"
 
 # LuCI frontend plus OpenWrt service/UCI schema used to make the pinned
 # ddns-go core package compatible with the LuCI management pages.
