@@ -74,19 +74,20 @@ Example:
 gh workflow run publish-release.yml `
   --repo Accelerator6666/openwrt-builder `
   --ref main `
-  -f source_run_id=<successful-run-id> `
+  -f run_id=<successful-run-id> `
   -f openwrt_ref=v25.12.5
 ```
 
-The default release tag is:
+If the optional `tag` and `title` inputs are left blank, the release workflow
+derives them from the successful source build. The default tag format is:
 
 ```text
 v25.12.5-x86_64-r<build-run-number>
 ```
 
 The release workflow verifies that the source run completed successfully, downloads
-its firmware artifact, discards non-firmware payloads, regenerates checksums and then
-creates or updates the GitHub Release.
+the already release-ready firmware artifact, verifies `SHA256SUMS`, and uploads the
+firmware images plus build metadata to a GitHub Release. It does not rebuild OpenWrt.
 
 ### x86_64 image selection
 
