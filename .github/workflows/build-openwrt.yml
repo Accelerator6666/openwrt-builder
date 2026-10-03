@@ -283,7 +283,11 @@ jobs:
         run: |
           cd openwrt
           make download -j"$(nproc)"
-          find dl -type f -size -1024c -print -delete
+
+          # Do not recursively delete small files from dl/go-mod-cache.
+          # Go modules legitimately contain many source files smaller than 1 KiB;
+          # deleting them corrupts the module cache and breaks packages such as dae.
+          find dl -maxdepth 1 -type f -size -1024c -print -delete
 
       - name: Build firmware
         shell: bash
