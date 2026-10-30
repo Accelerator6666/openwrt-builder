@@ -11,7 +11,7 @@ rm -f /etc/init.d/geowan-console \
 rm -rf /usr/libexec/geowan-console
 rm -f /tmp/luci-indexcache
 /etc/init.d/rpcd restart
-if [ "$1" = "--purge-data" ] 2>/dev/null; then
+if [ "${1:-}" = "--purge-data" ]; then
     rm -rf /etc/geowan-console
     echo "Uninstalled and purged telemetry"
 else
