@@ -1,0 +1,30 @@
+name: GeoWAN Console checks
+
+on:
+  pull_request:
+    paths:
+      - 'projects/geowan-console/**'
+      - '.github/workflows/geowan-console-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python agent unit tests
+        run: python3 -m unittest discover -s projects/geowan-console/tests -v
+      - name: POSIX shell syntax
+        run: |
+          for file in projects/geowan-console/install.sh projects/geowan-console/uninstall.sh projects/geowan-console/scripts/*.sh; do
+            sh -n "$file"
+          done
+      - name: LuCI JavaScript syntax
+        run: node --check projects/geowan-console/luci/overview.js
+      - name: JSON ACL and menu syntax
+        run: |
+          python3 -m json.tool projects/geowan-console/luci/acl.json >/dev/null
+          python3 -m json.tool projects/geowan-console/luci/menu.json >/dev/null
