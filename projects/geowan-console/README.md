@@ -17,17 +17,17 @@
 
 - OpenWrt 25.12.x、firewall4/nftables、LuCI、rpcd。
 - 已部署 /etc/nftables.d/90-geo-wan.nft，包含：
-  - \`geo_black4\` / \`geo_black6\` 动态 set
-  - \`geo_filter\` 统计链
-  - \`geo_wan_input\` / \`geo_wan_forward\`
-- Python 3 + SQLite 模块（在 OpenWrt 25.12 的 apk 镜像中是 \`python3\` 和 \`python3-sqlite3\`）。
-- 预留持久空间；数据库位置 \`/etc/geowan-console/telemetry.sqlite3\`，目录 0700；tmpfs 状态位于 \`/tmp/geowan-console/status.json\`。
+  - `geo_black4` / `geo_black6` 动态 set
+  - `geo_filter` 统计链
+  - `geo_wan_input` / `geo_wan_forward`
+- Python 3 + SQLite 模块（在 OpenWrt 25.12 的 apk 镜像中是 `python3` 和 `python3-sqlite3`）。
+- 预留持久空间；数据库位置 `/etc/geowan-console/telemetry.sqlite3`，目录 0700；tmpfs 状态位于 `/tmp/geowan-console/status.json`。
 
 ## 安装（从开发分支获取项目）
 
 在路由器 LAN 侧 SSH 中执行：
 
-\`\`\`sh
+```sh
 apk update
 apk add python3 python3-sqlite3 git
 cd /root
@@ -35,29 +35,29 @@ git clone --depth 1 --branch feature/geowan-console-v0.1 \
   https://github.com/Accelerator6666/openwrt-builder.git geowan-source
 cd /root/geowan-source/projects/geowan-console
 sh install.sh
-\`\`\`
+```
 
 再重新登录 LuCI，打开 **服务 → GeoWAN 安全面板**。
 
-> 如 \`apk\` 无法下载依赖，请先排查仓库网络与 DNS；安装脚本本身不会运行包管理器。
+> 如 `apk` 无法下载依赖，请先排查仓库网络与 DNS；安装脚本本身不会运行包管理器。
 
 ## 验收命令
 
-\`\`\`sh
+```sh
 /usr/bin/python3 /usr/libexec/geowan-console/agent.py collect
 /usr/bin/python3 /usr/libexec/geowan-console/agent.py restore
 cat /tmp/geowan-console/status.json
 nft list set inet fw4 geo_black4
 grep geowan-console /etc/crontabs/root
 logread | grep GEOWAN | tail
-\`\`\`
+```
 
-日志 \`/tmp/geowan-console-cron.log\` 与 \`/tmp/geowan-console-update.log\` 为**临时日志**；长期事件数据在 SQLite。
+日志 `/tmp/geowan-console-cron.log` 与 `/tmp/geowan-console-update.log` 为**临时日志**；长期事件数据在 SQLite。
 
 ## 数据含义
 
 - **丢弃包数**：当前 nftables 规则加载周期内的 counter；firewall4 reload/reboot 会归零。
-- **事件/来源排行/趋势**：仅来自 \`GEOWAN4\` / \`GEOWAN6\` 内核日志的样本。现有 GeoWAN 规则使用全局日志限速，不会完整记录每个 IP 和每次包命中；任何基于它的统计都不是攻击总量。
+- **事件/来源排行/趋势**：仅来自 `GEOWAN4` / `GEOWAN6` 内核日志的样本。现有 GeoWAN 规则使用全局日志限速，不会完整记录每个 IP 和每次包命中；任何基于它的统计都不是攻击总量。
 - **动态黑名单**：当前拒绝的*非 CN 来源 IP*，不等于已经证实为恶意攻击者。CN IP 仍可能攻击。
 - **GeoIP**：CN 归属表包括大陆地址，不代表攻击者的真实所在地；香港/澳门/台湾网段在默认 CN 表外。
 - **IPv6**：有规则和数据读取功能，但在没有 IPv6 WAN 默认路由时可能没有实际 IPv6 入站流量。
@@ -72,20 +72,20 @@ logread | grep GEOWAN | tail
 
 ## 卸载
 
-\`\`\`sh
+```sh
 cd /root/geowan-source/projects/geowan-console
 sh uninstall.sh
 # 如确定不再需要审计数据：
 # sh uninstall.sh --purge-data
-\`\`\`
+```
 
 卸载不会改动现有 GeoWAN 或其他防火墙规则。
 
 ## 测试
 
-\`\`\`sh
+```sh
 python3 -m unittest discover -s tests -v
 sh -n install.sh uninstall.sh scripts/*.sh
-\`\`\`
+```
 
 后续方向：更细粒度的入站速率控制、用户确认的可信 IP 白名单、远程 Syslog、真实来源国家 ASN 归属分析。均须在独立评审后增加，不能在采集组件里偷偷修改防火墙。
