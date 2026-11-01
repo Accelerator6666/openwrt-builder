@@ -2,8 +2,11 @@
 """rpcd executable plugin exposing read-only GeoWAN IP lookup."""
 import json
 import sys
+from pathlib import Path
 
-sys.path.insert(0, "/usr/libexec/geowan-console")
+installed = Path("/usr/libexec/geowan-console")
+repository_agent = Path(__file__).resolve().parents[1] / "agent"
+sys.path.insert(0, str(installed if installed.is_dir() else repository_agent))
 from geowan_rpc import dispatch
 
 if len(sys.argv) < 2:
