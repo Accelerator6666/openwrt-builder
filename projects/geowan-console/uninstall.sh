@@ -12,7 +12,6 @@ rm -f /etc/init.d/geowan-console /etc/init.d/geowan-monitor \
     /www/luci-static/resources/view/geowan/overview.js \
     /www/luci-static/resources/geowan/geowan.css
 rm -rf /usr/libexec/geowan-console
-/etc/init.d/rpcd restart 2>/dev/null || :
 rm -f /tmp/luci-indexcache
 /etc/init.d/rpcd restart
 if [ "${1:-}" = "--purge-data" ]; then
