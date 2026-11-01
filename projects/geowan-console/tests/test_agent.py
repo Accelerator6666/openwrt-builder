@@ -20,6 +20,45 @@ class AgentTests(unittest.TestCase):
         self.assertIsNone(g.parse_member({"elem": {"val": "8.8.8.8"}}, 6))
         self.assertIsNone(g.parse_member({"elem": {"val": "bad-data"}}, 4))
 
+    def test_incremental_snapshot_avoids_rewriting_unchanged_expiry(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.object(g, "DB", Path(tmp) / "db.sqlite"):
+                conn = g.db_open()
+                now = 1800000000
+                with mock.patch.object(g, "read_members",
+                                       side_effect=[{"8.8.8.8": 7000}, {}]):
+                    sizes, errors = g.snapshot_incremental(conn, now)
+                self.assertEqual(sizes, {"4": 1, "6": 0})
+                self.assertEqual(errors, [])
+                first = conn.execute(
+                    "SELECT first_seen,last_seen,expires_at FROM bans WHERE ip=?",
+                    ("8.8.8.8",)
+                ).fetchone()
+                self.assertEqual(first, (now, now, now + 7000))
+
+                # A normal countdown preserves the same absolute expiry.
+                with mock.patch.object(g, "read_members",
+                                       side_effect=[{"8.8.8.8": 6970}, {}]):
+                    g.snapshot_incremental(conn, now + 30)
+                second = conn.execute(
+                    "SELECT first_seen,last_seen,expires_at FROM bans WHERE ip=?",
+                    ("8.8.8.8",)
+                ).fetchone()
+                self.assertEqual(second, first)
+
+                # A renewed seven-day TTL is a meaningful change and is persisted.
+                with mock.patch.object(g, "read_members",
+                                       side_effect=[{"8.8.8.8": g.MAX_TTL}, {}]):
+                    g.snapshot_incremental(conn, now + 600)
+                third = conn.execute(
+                    "SELECT first_seen,last_seen,expires_at FROM bans WHERE ip=?",
+                    ("8.8.8.8",)
+                ).fetchone()
+                self.assertEqual(third[0], now)
+                self.assertEqual(third[1], now + 600)
+                self.assertEqual(third[2], now + 600 + g.MAX_TTL)
+                conn.close()
+
     def test_nft_json_inventory(self):
         example = {"nftables": [{"metainfo": {}}, {"set": {
             "name": "geo_black4", "elem": [
