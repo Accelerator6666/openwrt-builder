@@ -34,6 +34,11 @@ fw4 check >/dev/null || {
     exit 1
 }
 
+# Stop an existing v0.2 monitor before replacing its executable or service file.
+if [ -x /etc/init.d/geowan-monitor ]; then
+    /etc/init.d/geowan-monitor stop 2>/dev/null || :
+fi
+
 mkdir -p /usr/libexec/geowan-console \
     /usr/share/luci/menu.d /usr/share/rpcd/acl.d \
     /www/luci-static/resources/view/geowan \
