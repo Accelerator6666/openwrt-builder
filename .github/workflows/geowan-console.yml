@@ -28,7 +28,11 @@ jobs:
         run: python -m unittest discover -s projects/geowan-console/tests -v
 
       - name: Python syntax
-        run: python -m py_compile projects/geowan-console/agent/geowan_agent.py
+        run: |
+          python -m py_compile projects/geowan-console/agent/geowan_agent.py
+          python -m py_compile projects/geowan-console/agent/geowan_geoip.py
+          python -m py_compile projects/geowan-console/agent/geowan_rpc.py
+          python -m py_compile projects/geowan-console/rpcd/geowan
 
       - name: Shell syntax
         run: |
