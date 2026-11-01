@@ -1,10 +1,13 @@
 {
   "luci-app-geowan-console": {
-    "description": "Read sanitized GeoWAN dashboard data",
+    "description": "Read GeoWAN dashboard data and perform local IP geolocation lookup",
     "read": {
       "ubus": {
         "file": [
           "read"
+        ],
+        "geowan": [
+          "lookup"
         ]
       },
       "file": {

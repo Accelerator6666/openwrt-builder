@@ -17,12 +17,14 @@ echo "===== DEPENDENCIES ====="
 if [ -x /usr/bin/python3 ]; then
     /usr/bin/python3 -c 'import sys,sqlite3,json,ipaddress; print("Python",sys.version.split()[0],"SQLite",sqlite3.sqlite_version)' \
       && pass "Python standard library + SQLite" || fail "Python SQLite import"
+    /usr/bin/python3 -c 'import maxminddb; print("maxminddb",maxminddb.__version__ if hasattr(maxminddb,"__version__") else "available")' \
+      && pass "Optional offline MMDB reader" || warn "Optional GeoIP reader missing; install python3-maxminddb to enable country/city/ASN enrichment"
 else
     fail "/usr/bin/python3 missing"
 fi
 [ -d /usr/share/luci/menu.d ] && pass "LuCI menu directory" || fail "LuCI missing"
 [ -d /usr/share/rpcd/acl.d ] && pass "rpcd ACL directory" || fail "rpcd missing"
-[ -x /usr/local/sbin/update-geowan.sh ] && pass "GeoIP updater exists (not executed)" || warn "GeoIP updater not found"
+[ -x /usr/local/sbin/update-geowan.sh ] && pass "CN prefix-list updater exists (not executed)" || warn "CN prefix-list updater not found"
 
 echo
 echo "===== FIREWALL VALIDATION (NO RELOAD) ====="
@@ -62,6 +64,7 @@ logread 2>/dev/null | grep -E 'GEOWAN[46]' | tail -n 5 || true
 echo
 echo "===== STORAGE AND EXISTING SCHEDULE ====="
 df -h /overlay 2>/dev/null || true
+[ -d /etc/geowan-console/geoip/current ] && ls -lh /etc/geowan-console/geoip/current/ 2>/dev/null || echo "No offline GeoIP database installed"
 grep -F 'geowan-console' /etc/crontabs/root 2>/dev/null || echo "No GeoWAN Console cron entries"
 echo
 if [ "$FAIL" -eq 0 ]; then

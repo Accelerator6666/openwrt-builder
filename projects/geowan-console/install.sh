@@ -34,17 +34,56 @@ fw4 check >/dev/null || {
     exit 1
 }
 
+# Validate the rpcd executable against the source checkout before touching
+# installed files or services. This catches stale v0.1 module directories.
+RPC_LIST="$(/usr/bin/python3 "$BASE/rpcd/geowan" list)" || {
+    echo "rpcd plugin list self-test failed; installation stopped."
+    exit 1
+}
+printf '%s' "$RPC_LIST" | /usr/bin/python3 -c '
+import json,sys
+data=json.load(sys.stdin)
+assert data == {"lookup":{"ip":""}}, data
+' || {
+    echo "rpcd plugin list response invalid; installation stopped."
+    exit 1
+}
+
+RPC_PRIVATE="$(printf '%s' '{"ip":"10.0.0.1"}' | /usr/bin/python3 "$BASE/rpcd/geowan" call lookup)" || {
+    echo "rpcd plugin call self-test failed; installation stopped."
+    exit 1
+}
+printf '%s' "$RPC_PRIVATE" | /usr/bin/python3 -c '
+import json,sys
+data=json.load(sys.stdin)
+assert data.get("lookup_status") == "non_global", data
+' || {
+    echo "rpcd plugin call response invalid; installation stopped."
+    exit 1
+}
+echo "rpcd plugin self-tests passed."
+
+# Stop an existing v0.2 monitor before replacing its executable or service file.
+if [ -x /etc/init.d/geowan-monitor ]; then
+    /etc/init.d/geowan-monitor stop 2>/dev/null || :
+fi
+
 mkdir -p /usr/libexec/geowan-console \
-    /usr/share/luci/menu.d /usr/share/rpcd/acl.d \
+    /usr/share/luci/menu.d /usr/share/rpcd/acl.d /usr/libexec/rpcd \
     /www/luci-static/resources/view/geowan \
     /www/luci-static/resources/geowan \
     /etc/geowan-console /tmp/geowan-console
 chmod 700 /etc/geowan-console
 
 cp "$BASE/agent/geowan_agent.py" /usr/libexec/geowan-console/agent.py
+cp "$BASE/agent/geowan_geoip.py" /usr/libexec/geowan-console/geowan_geoip.py
+cp "$BASE/agent/geowan_rpc.py" /usr/libexec/geowan-console/geowan_rpc.py
+cp "$BASE/rpcd/geowan" /usr/libexec/rpcd/geowan
 cp "$BASE/scripts/task.sh" /usr/libexec/geowan-console/task.sh
 cp "$BASE/scripts/update.sh" /usr/libexec/geowan-console/update.sh
+cp "$BASE/scripts/update-geoip.sh" /usr/libexec/geowan-console/update-geoip.sh
 cp "$BASE/scripts/init.sh" /etc/init.d/geowan-console
+cp "$BASE/scripts/monitor.init.sh" /etc/init.d/geowan-monitor
 cp "$BASE/luci/overview.js" /www/luci-static/resources/view/geowan/overview.js
 cp "$BASE/luci/geowan.css" /www/luci-static/resources/geowan/geowan.css
 cp "$BASE/luci/menu.json" /usr/share/luci/menu.d/luci-app-geowan-console.json
@@ -52,25 +91,33 @@ cp "$BASE/luci/acl.json" /usr/share/rpcd/acl.d/luci-app-geowan-console.json
 
 chmod 700 /usr/libexec/geowan-console/agent.py \
     /usr/libexec/geowan-console/task.sh \
-    /usr/libexec/geowan-console/update.sh
+    /usr/libexec/geowan-console/update.sh \
+    /usr/libexec/geowan-console/update-geoip.sh
+chmod 755 /usr/libexec/rpcd/geowan
 chmod 755 /etc/init.d/geowan-console
+chmod 755 /etc/init.d/geowan-monitor
 chmod 644 /usr/share/luci/menu.d/luci-app-geowan-console.json \
     /usr/share/rpcd/acl.d/luci-app-geowan-console.json \
     /www/luci-static/resources/view/geowan/overview.js \
     /www/luci-static/resources/geowan/geowan.css
 
-# Collection only. Weekly GeoIP refresh is deliberately NOT scheduled until
-# the existing update-geowan.sh passes nft/fw4 validation on this router.
+# Keep GeoIP downloads manual until the DB-IP release and local reader are
+# validated on this router; telemetry reconciliation remains scheduled.
 grep -Fq '# geowan-console-collect' /etc/crontabs/root 2>/dev/null || \
   echo '*/5 * * * * /usr/libexec/geowan-console/task.sh >/tmp/geowan-console-cron.log 2>&1 # geowan-console-collect' >> /etc/crontabs/root
 
 /etc/init.d/geowan-console enable
+/etc/init.d/geowan-monitor enable
 /etc/init.d/cron enable
 /etc/init.d/cron restart
 /etc/init.d/rpcd restart
 rm -f /tmp/luci-indexcache
 /usr/libexec/geowan-console/task.sh
+/etc/init.d/geowan-monitor start
 echo "GeoWAN Console installed. Open LuCI -> Services -> GeoWAN 安全面板."
 echo "Database: /etc/geowan-console/telemetry.sqlite3"
-echo "Collection: every 5 minutes; weekly GeoIP update remains disabled pending validation."
+echo "Fast monitor: counters every 5s, blacklist inventory/log scan every 15s; 5-minute reconciliation remains enabled."
+if ! /usr/bin/python3 -c 'import maxminddb' >/dev/null 2>&1; then
+    echo "GeoIP lookup is optional and inactive. Install with: apk add python3-maxminddb"
+fi
 echo "No new TCP/UDP port and no firewall rules modified."

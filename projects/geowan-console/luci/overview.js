@@ -9,6 +9,10 @@ var readStatus = rpc.declare({
     expect: { data: '' }
 });
 
+var lookupIp = rpc.declare({
+    object: 'geowan', method: 'lookup', params: [ 'ip' ]
+});
+
 function timeString(epoch) {
     return epoch ? new Date(epoch * 1000).toLocaleString() : '—';
 }
@@ -49,7 +53,70 @@ function panel(title, body) {
     return E('section', { 'class': 'gw-panel' }, children);
 }
 
-function draw(d) {
+
+
+function lookupPanel() {
+    var input = E('input', {
+        'type': 'text',
+        'class': 'cbi-input-text',
+        'placeholder': '输入公网 IPv4 或 IPv6 地址',
+        'autocomplete': 'off',
+        'spellcheck': 'false'
+    });
+    var button = E('button', {
+        'type': 'button',
+        'class': 'cbi-button cbi-button-action'
+    }, '查询归属地');
+    var result = E('div', { 'class': 'gw-lookup-result' }, '输入 IP 地址后查询本地离线数据库。');
+    function runLookup() {
+        var value = input.value.trim();
+        if (!value) {
+            dom.content(result, '请输入 IP 地址。');
+            return;
+        }
+        button.disabled = true;
+        dom.content(result, '正在查询……');
+        lookupIp(value).then(function(data) {
+            button.disabled = false;
+            if (data.error) {
+                dom.content(result, '查询失败：' + data.error);
+                return;
+            }
+            if (data.lookup_status != 'ok') {
+                var labels = {
+                    invalid: 'IP 地址格式不正确',
+                    non_global: '这是非公网地址，不进行公网归属地定位',
+                    unavailable: 'GeoIP 数据库或 MMDB Reader 尚未安装',
+                    not_found: '数据库中没有匹配记录'
+                };
+                dom.content(result, labels[data.lookup_status] || '未能取得归属信息');
+                return;
+            }
+            dom.content(result, table(['字段', '查询结果'], [
+                ['IP 地址', data.ip],
+                ['国家 / 地区', (data.country_name || '未知') + (data.country_code ? ' (' + data.country_code + ')' : '')],
+                ['大洲', data.continent_name || data.continent_code],
+                ['省份 / 州', data.region],
+                ['城市', data.city],
+                ['ASN', data.asn ? 'AS' + data.asn : ''],
+                ['网络组织', data.asn_org],
+                ['数据源', data.provider + ' · ' + data.database_version]
+            ]));
+        }).catch(function(error) {
+            button.disabled = false;
+            dom.content(result, 'RPC 查询失败：' + String(error));
+        });
+    }
+    button.addEventListener('click', runLookup);
+    input.addEventListener('keydown', function(event) {
+        if (event.key == 'Enter')
+            runLookup();
+    });
+    return panel('IP 归属地查询（本地离线数据库）',
+        E('div', { 'class': 'gw-lookup' }, [input, button, result]));
+}
+
+function draw(d, lookupNode) {
     var counters = d.counters || {};
     var total = (counters.black4 || 0) + (counters.geo4 || 0) +
                 (counters.black6 || 0) + (counters.geo6 || 0);
@@ -77,31 +144,44 @@ function draw(d) {
             card('活跃黑名单记录', d.active_bans || 0, 'IPv4 / IPv6 · 过期自动释放'),
             card('本次规则加载以来丢弃包', total, 'nftables counter，非历史累计'),
             card('过去 24 小时日志样本', d.samples_24h || 0, '受内核日志限速影响'),
+            card('监控数据更新', timeString(d.updated), d.collector && d.collector.mode == 'fast' ? '快速监控运行中' : '定时对账模式'),
+            card('GeoIP 数据库', d.geoip && d.geoip.enabled ? d.geoip.database_version : '未安装', d.geoip ? ('已识别 ' + d.geoip.resolved_active_bans + ' / ' + d.geoip.active_bans + ' 个活跃 IP') : '离线归属查询'),
             card('IPv4 / IPv6 集合', (d.set_sizes && d.set_sizes['4'] != null ? d.set_sizes['4'] : '?')
                 + ' / ' + (d.set_sizes && d.set_sizes['6'] != null ? d.set_sizes['6'] : '?'), '活跃 IP 条目数')
         ]),
+        lookupNode || E('span'),
         panel('24 小时拦截日志趋势（采样）', [
             bars,
             E('div', { 'class': 'gw-chart-axis' }, ['23 小时前', '当前'])
         ]),
         E('div', { 'class': 'gw-columns' }, [
-            panel('日志样本最多的来源', table(['来源 IP', '日志数'],
-                (d.top_sources || []).map(function(r) { return [r.ip, r.count]; }))),
-            panel('目标端口（DNAT 后）', table(['端口', '用途', '日志数'],
+            panel('日志样本最多的来源', table(['来源 IP', '国家', '城市', 'ASN', '日志数'],
+                (d.top_sources || []).map(function(r) {
+                    return [r.ip, r.country || r.country_code, r.city, r.asn ? ('AS' + r.asn + ' ' + (r.asn_org || '')) : '', r.count];
+                }))),
+            panel('日志目标端口（DPT）', table(['端口', '用途', '日志样本'],
                 (d.top_ports || []).map(function(r) { return [r.port, r.service, r.count]; })))
         ]),
-        panel('最近的拒绝记录', table(['时间', '来源 IP', '目标 IP', '目标端口', '协议'],
+        E('div', { 'class': 'gw-columns' }, [
+            panel('海外来源国家排行（活跃封禁 IP）', table(['国家', '国家代码', 'IP 数'],
+                (d.top_countries || []).map(function(r) { return [r.country, r.code, r.ips]; }))),
+            panel('来源 ASN / 网络组织排行', table(['ASN', '网络组织', 'IP 数'],
+                (d.top_asns || []).map(function(r) { return [r.asn ? ('AS' + r.asn) : '', r.organization, r.ips]; })))
+        ]),
+        panel('最近的拒绝记录（日志样本）', table(['时间', '来源 IP', '国家', '城市', '目标 IP', '目标端口', '协议'],
             (d.events || []).slice(0, 40).map(function(r) {
-                return [timeString(r.time), r.src, r.dst, r.port, r.proto];
+                return [timeString(r.time), r.src, r.country || r.country_code, r.city, r.dst, r.port, r.proto];
             }))),
-        panel('持久化黑名单（最近 120 条）', table(['IP', '协议族', '有效期至'],
+        panel('持久化黑名单（最近 120 条）', table(['IP', '协议族', '国家', '地区 / 城市', 'ASN / 网络组织', '有效期至'],
             (d.blacklist || []).map(function(r) {
-                return [r.ip, 'IPv' + r.family, timeString(r.expires)];
+                return [r.ip, 'IPv' + r.family, r.country || r.country_code, [r.region, r.city].filter(Boolean).join(' / '), r.asn ? ('AS' + r.asn + ' ' + (r.asn_org || '')) : '', timeString(r.expires)];
             }))),
         (d.errors || []).length ? E('p', { 'class': 'gw-error' }, d.errors.join('；')) : E('span'),
         E('div', { 'class': 'gw-footer' }, [
-            '更新：' + timeString(d.updated) + ' · ',
-            d.disclaimer || '统计数据仅供防火墙运维使用。'
+            '更新：' + timeString(d.updated) + ' · ' +
+            (d.collector ? ('采集：' + d.collector.mode + ' · 黑名单扫描：' + d.collector.inventory_interval_seconds + ' 秒 · ') : ''),
+            d.disclaimer || '统计数据仅供防火墙运维使用。',
+            d.geoip && d.geoip.enabled ? E('a', { 'href': d.geoip.attribution_url, 'target': '_blank', 'rel': 'noopener noreferrer' }, 'IP Geolocation by DB-IP') : ''
         ])
     ]);
 }
@@ -111,14 +191,17 @@ return view.extend({
         return readStatus('/tmp/geowan-console/status.json').then(dataFromRpc);
     },
     render: function(data) {
-        var root = E('div', {}, draw(data));
+        var lookup = lookupPanel();
+        var app = draw(data, lookup);
+        var root = E('div', {}, app);
         poll.add(function() {
             return readStatus('/tmp/geowan-console/status.json').then(function(next) {
-                dom.content(root, draw(dataFromRpc(next)));
+                var refreshed = draw(dataFromRpc(next), lookup);
+                dom.content(root, refreshed);
             }).catch(function() {
                 /* Keep the last known snapshot visible during an RPC outage. */
             });
-        }, 30);
+        }, 5);
         return root;
     },
     handleSaveApply: null,
