@@ -9,7 +9,8 @@
         "geowan": [
           "lookup",
           "list_bans",
-          "get_ban"
+          "get_ban",
+          "analytics"
         ]
       },
       "file": {
