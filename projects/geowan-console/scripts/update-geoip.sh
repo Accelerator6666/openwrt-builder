@@ -18,6 +18,9 @@ command -v gzip >/dev/null 2>&1 || { echo "gzip is required"; exit 1; }
 }
 
 if [ -L "$ROOT/current" ] &&
+   [ -s "$ROOT/current/country.mmdb" ] &&
+   [ -s "$ROOT/current/city.mmdb" ] &&
+   [ -s "$ROOT/current/asn.mmdb" ] &&
    [ -f "$ROOT/current/metadata.json" ] &&
    grep -Fq "\"release\": \"$RELEASE\"" "$ROOT/current/metadata.json"; then
     echo "DB-IP Lite $RELEASE is already active."
