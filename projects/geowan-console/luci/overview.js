@@ -417,8 +417,8 @@ function analyticsPanel() {
         }
 
         dom.content(summary,
-            data.period_label + ' · ' + data.from_ts + ' 至 ' + data.to_ts +
-            ' · GeoIP 数据库 ' + data.database_version);
+            data.period_label + ' · ' + timeString(data.from_ts) + ' 至 ' +
+            timeString(data.to_ts) + ' · GeoIP 数据库 ' + data.database_version);
 
         dom.content(metrics, [
             card('日志事件样本', data.event_samples || 0, '受内核日志限速影响'),
@@ -533,7 +533,13 @@ function draw(d, lookupNode, blacklistNode, analyticsNode) {
             card('监控数据更新', timeString(d.updated), d.collector && d.collector.mode == 'fast' ? '快速监控运行中' : '定时对账模式'),
             card('GeoIP 数据库', d.geoip && d.geoip.enabled ? d.geoip.database_version : '未安装', d.geoip ? ('已识别 ' + d.geoip.resolved_active_bans + ' / ' + d.geoip.active_bans + ' 个活跃 IP') : '离线归属查询'),
             card('IPv4 / IPv6 集合', (d.set_sizes && d.set_sizes['4'] != null ? d.set_sizes['4'] : '?')
-                + ' / ' + (d.set_sizes && d.set_sizes['6'] != null ? d.set_sizes['6'] : '?'), '活跃 IP 条目数')
+                + ' / ' + (d.set_sizes && d.set_sizes['6'] != null ? d.set_sizes['6'] : '?'), '活跃 IP 条目数'),
+            card('监控周期', d.collector ? ((d.collector.counter_interval_seconds || '?') + 's / '
+                + (d.collector.inventory_interval_seconds || '?') + 's / '
+                + (d.collector.log_scan_interval_seconds || '?') + 's') : '未知',
+                '计数器 / 黑名单盘点 / 日志扫描'),
+            card('最近黑名单盘点', d.collector ? timeString(d.collector.last_inventory) : '未知',
+                '面板可见性有采集与刷新延迟')
         ]),
         lookupNode || E('span'),
         analyticsNode || E('span'),
@@ -551,7 +557,10 @@ function draw(d, lookupNode, blacklistNode, analyticsNode) {
         (d.errors || []).length ? E('p', { 'class': 'gw-error' }, d.errors.join('；')) : E('span'),
         E('div', { 'class': 'gw-footer' }, [
             '更新：' + timeString(d.updated) + ' · ' +
-            (d.collector ? ('采集：' + d.collector.mode + ' · 黑名单扫描：' + d.collector.inventory_interval_seconds + ' 秒 · ') : ''),
+            (d.collector ? ('采集：' + d.collector.mode + ' · 计数器：' +
+                d.collector.counter_interval_seconds + ' 秒 · 黑名单盘点：' +
+                d.collector.inventory_interval_seconds + ' 秒 · 日志扫描：' +
+                d.collector.log_scan_interval_seconds + ' 秒 · ') : ''),
             d.disclaimer || '统计数据仅供防火墙运维使用。',
             d.geoip && d.geoip.enabled ? E('a', { 'href': d.geoip.attribution_url, 'target': '_blank', 'rel': 'noopener noreferrer' }, 'IP Geolocation by DB-IP') : ''
         ])
