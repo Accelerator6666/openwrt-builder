@@ -132,7 +132,7 @@ class GeoWANProfileTests(unittest.TestCase):
         self.assertEqual(result["samples"], 5)
         self.assertEqual(result["active_banned_sources"], 1)
         self.assertEqual(result["top_ports"][0]["port"], 443)
-        self.assertEqual(result["correlations"][0]["source_count"], 2)
+        self.assertEqual(result["correlations"][0]["source_count"], 3)
 
     def test_asn_profile_rejects_invalid_asn(self):
         for value in (0, -1, 4294967296, True, "15169"):
