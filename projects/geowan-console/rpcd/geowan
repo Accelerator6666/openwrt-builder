@@ -28,7 +28,8 @@ METHODS = {
         "country_code": "", "asn": 0, "port": 0, "proto": "",
         "sort": "last_seen"
     },
-    "get_ban": {"ip": ""}
+    "get_ban": {"ip": ""},
+    "analytics": {"period": "24h"}
 }
 
 if len(sys.argv) < 2:
