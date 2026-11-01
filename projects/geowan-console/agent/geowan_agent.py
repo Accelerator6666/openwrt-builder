@@ -322,10 +322,15 @@ def geoip_summary(conn, now):
     metadata = read_metadata()
     version = str(metadata.get("release") or "unknown")
     provider = str(metadata.get("provider") or "DB-IP Lite")
-    files_present = any(
+    files_present = all(
         (GEOIP_DIR / filename).is_file()
         for filename in ("country.mmdb", "city.mmdb", "asn.mmdb")
     )
+    try:
+        import maxminddb  # noqa: F401
+        reader_available = True
+    except ImportError:
+        reader_available = False
     active = conn.execute(
         "SELECT COUNT(*) FROM bans WHERE expires_at>?", (now,)
     ).fetchone()[0]
@@ -353,7 +358,9 @@ def geoip_summary(conn, now):
         "AND g.asn IS NOT NULL GROUP BY g.asn,g.asn_org "
         "ORDER BY COUNT(*) DESC LIMIT 20", (now, version))]
     return {
-        "enabled": bool(files_present),
+        "enabled": bool(files_present and reader_available),
+        "files_present": bool(files_present),
+        "reader_available": reader_available,
         "provider": provider,
         "database_version": version,
         "attribution_url": "https://db-ip.com",
