@@ -144,6 +144,28 @@ class RpcLookupTests(unittest.TestCase):
         self.assertEqual(methods["correlations"], {"period": "24h"})
         self.assertEqual(methods["list_bans"]["page_size"], 50)
 
+    def test_dispatch_routes_new_read_only_profile_methods(self):
+        with mock.patch.object(geowan_rpc, "source_profile", return_value={"source": True}) as source:
+            self.assertEqual(
+                geowan_rpc.dispatch("source_profile", {"ip": "8.8.8.8"}),
+                {"source": True}
+            )
+            source.assert_called_once_with({"ip": "8.8.8.8"})
+
+        with mock.patch.object(geowan_rpc, "asn_profile", return_value={"asn": True}) as asn:
+            self.assertEqual(
+                geowan_rpc.dispatch("asn_profile", {"asn": 15169}),
+                {"asn": True}
+            )
+            asn.assert_called_once_with({"asn": 15169})
+
+        with mock.patch.object(geowan_rpc, "correlations", return_value={"clusters": []}) as corr:
+            self.assertEqual(
+                geowan_rpc.dispatch("correlations", {"period": "24h"}),
+                {"clusters": []}
+            )
+            corr.assert_called_once_with({"period": "24h"})
+
     def test_rpcd_plugin_call_protocol(self):
         plugin = Path(__file__).resolve().parents[1] / "rpcd" / "geowan"
         result = subprocess.run(
