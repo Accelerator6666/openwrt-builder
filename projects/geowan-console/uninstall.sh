@@ -1,7 +1,8 @@
 #!/bin/sh
 set -eu
-/etc/init.d/geowan-console disable 2>/dev/null || :
+/etc/init.d/geowan-monitor stop 2>/dev/null || :
 /etc/init.d/geowan-monitor disable 2>/dev/null || :
+/etc/init.d/geowan-console disable 2>/dev/null || :
 sed -i '/# geowan-console-collect/d; /# geowan-console-update/d' /etc/crontabs/root
 /etc/init.d/cron restart
 rm -f /etc/init.d/geowan-console /etc/init.d/geowan-monitor \
