@@ -43,7 +43,10 @@ RPC_LIST="$(/usr/bin/python3 "$BASE/rpcd/geowan" list)" || {
 printf '%s' "$RPC_LIST" | /usr/bin/python3 -c '
 import json,sys
 data=json.load(sys.stdin)
-assert data == {"lookup":{"ip":""}}, data
+assert set(data) == {"lookup","list_bans","get_ban"}, data
+assert data["lookup"] == {"ip":""}, data
+assert data["get_ban"] == {"ip":""}, data
+assert data["list_bans"]["page_size"] == 50, data
 ' || {
     echo "rpcd plugin list response invalid; installation stopped."
     exit 1
@@ -59,6 +62,31 @@ data=json.load(sys.stdin)
 assert data.get("lookup_status") == "non_global", data
 ' || {
     echo "rpcd plugin call response invalid; installation stopped."
+    exit 1
+}
+RPC_BAD_FILTER="$(printf '%s' '{"port":70000}' | /usr/bin/python3 "$BASE/rpcd/geowan" call list_bans)" || {
+    echo "rpcd blacklist self-test failed; installation stopped."
+    exit 1
+}
+printf '%s' "$RPC_BAD_FILTER" | /usr/bin/python3 -c '
+import json,sys
+data=json.load(sys.stdin)
+assert data.get("error") == "invalid_parameters", data
+' || {
+    echo "rpcd blacklist validation response invalid; installation stopped."
+    exit 1
+}
+
+RPC_BAD_DETAIL="$(printf '%s' '{"ip":"not-an-ip"}' | /usr/bin/python3 "$BASE/rpcd/geowan" call get_ban)" || {
+    echo "rpcd detail self-test failed; installation stopped."
+    exit 1
+}
+printf '%s' "$RPC_BAD_DETAIL" | /usr/bin/python3 -c '
+import json,sys
+data=json.load(sys.stdin)
+assert data.get("error") == "invalid_ip", data
+' || {
+    echo "rpcd detail validation response invalid; installation stopped."
     exit 1
 }
 echo "rpcd plugin self-tests passed."
