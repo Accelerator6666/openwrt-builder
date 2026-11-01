@@ -72,8 +72,8 @@ def parse_member(entry, family):
         return None
     seconds = MAX_TTL
     if isinstance(expires, (int, float)):
-        # nft -j prints timeout/expires in milliseconds on recent releases.
-        seconds = min(MAX_TTL, max(1, int(expires / 1000)))
+        # libnftables JSON reports timeout/expires in seconds.
+        seconds = min(MAX_TTL, max(1, int(expires)))
     return str(ip), seconds
 
 
