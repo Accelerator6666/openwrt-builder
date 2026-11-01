@@ -132,9 +132,10 @@ class RpcLookupTests(unittest.TestCase):
             f"rpcd list failed: stdout={result.stdout!r}, stderr={result.stderr!r}"
         )
         methods = json.loads(result.stdout)
-        self.assertEqual(set(methods), {"lookup", "list_bans", "get_ban"})
+        self.assertEqual(set(methods), {"lookup", "list_bans", "get_ban", "analytics"})
         self.assertEqual(methods["lookup"], {"ip": ""})
         self.assertEqual(methods["get_ban"], {"ip": ""})
+        self.assertEqual(methods["analytics"], {"period": "24h"})
         self.assertEqual(methods["list_bans"]["page_size"], 50)
 
     def test_rpcd_plugin_call_protocol(self):
@@ -218,6 +219,57 @@ class RpcLookupTests(unittest.TestCase):
         self.assertEqual(
             geowan_rpc.list_bans({"family": 5}),
             {"error": "invalid_parameters"}
+        )
+
+    def test_analytics_returns_period_trend_and_sampled_rankings(self):
+        now = 1800000000
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "telemetry.sqlite3"
+            make_inventory_db(path, now)
+            conn = sqlite3.connect(path)
+            conn.execute(
+                "INSERT INTO events VALUES(?,?,?,?,?,?,?)",
+                ("evt4", now - 40, 4, "8.8.8.8", "10.0.0.61", 31080, "TCP")
+            )
+            conn.commit()
+            conn.close()
+
+            with mock.patch.object(
+                geowan_rpc, "read_metadata", return_value={"release": "2026-11"}
+            ):
+                result = geowan_rpc.analytics(
+                    {"period": "24h"}, db_path=path, now=now
+                )
+                self.assertEqual(result["event_samples"], 4)
+                self.assertEqual(result["unique_sources"], 3)
+                self.assertEqual(len(result["trend"]), 24)
+                self.assertEqual(sum(x["count"] for x in result["trend"]), 4)
+                self.assertEqual(result["top_ports"][0]["port"], 31080)
+                self.assertEqual(result["top_ports"][0]["samples"], 2)
+                self.assertEqual(result["top_protocols"][0]["proto"], "TCP")
+                self.assertEqual(result["top_protocols"][0]["samples"], 3)
+                self.assertEqual(result["top_countries"][0]["code"], "US")
+                self.assertEqual(result["top_countries"][0]["source_ips"], 2)
+                self.assertEqual(result["top_countries"][0]["samples"], 3)
+                self.assertEqual(result["top_asns"][0]["asn"], 15169)
+                self.assertEqual(result["top_asns"][0]["source_ips"], 2)
+
+                expected = {"1h": (12, 300), "7d": (7, 86400), "30d": (30, 86400)}
+                for period, (count, bucket) in expected.items():
+                    selected = geowan_rpc.analytics(
+                        {"period": period}, db_path=path, now=now
+                    )
+                    self.assertEqual(len(selected["trend"]), count)
+                    self.assertEqual(selected["bucket_seconds"], bucket)
+
+    def test_analytics_rejects_invalid_period(self):
+        self.assertEqual(
+            geowan_rpc.analytics({"period": "all"}),
+            {"error": "invalid_period"}
+        )
+        self.assertEqual(
+            geowan_rpc.analytics(None),
+            {"error": "invalid_period"}
         )
 
     def test_get_ban_returns_geoip_and_bounded_event_history(self):
