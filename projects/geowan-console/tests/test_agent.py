@@ -98,6 +98,24 @@ class AgentTests(unittest.TestCase):
                 self.assertEqual(g.enrich_pending(conn, Resolver(), now, limit=10), 0)
                 conn.close()
 
+    def test_geoip_cache_cleanup_is_bounded(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.object(g, "DB", Path(tmp) / "db.sqlite"):
+                conn = g.db_open()
+                now = 1800000000
+                conn.executemany(
+                    "INSERT INTO geoip_cache(ip,lookup_status,updated_at) VALUES(?,?,?)",
+                    [(f"203.0.113.{i}", "not_found", now - 100 * 86400)
+                     for i in range(1, 1201)]
+                )
+                conn.commit()
+                g.cleanup_geoip_cache(conn, now)
+                remaining = conn.execute(
+                    "SELECT COUNT(*) FROM geoip_cache"
+                ).fetchone()[0]
+                self.assertEqual(remaining, 200)
+                conn.close()
+
     def test_nft_json_inventory(self):
         example = {"nftables": [{"metainfo": {}}, {"set": {
             "name": "geo_black4", "elem": [
