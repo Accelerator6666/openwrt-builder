@@ -483,15 +483,17 @@ def collect():
 
 def build_status(conn, now, sizes, errors):
     since = now - 86400
+    geo = geoip_summary(conn, now)
+    geo_version = geo["database_version"]
     total = conn.execute("SELECT COUNT(*) FROM events WHERE ts>=?", (since,)).fetchone()[0]
     active = conn.execute("SELECT COUNT(*) FROM bans WHERE expires_at>?", (now,)).fetchone()[0]
     top_ip = [{"ip": ip, "count": cnt, "country_code": cc,
                 "country": country, "city": city, "asn": asn,
                 "asn_org": org} for ip, cnt, cc, country, city, asn, org in conn.execute(
         "SELECT e.src,COUNT(*) n,g.country_code,g.country_name,g.city,g.asn,g.asn_org "
-        "FROM events e LEFT JOIN geoip_cache g ON g.ip=e.src WHERE e.ts>=? "
+        "FROM events e LEFT JOIN geoip_cache g ON g.ip=e.src AND g.database_version=? WHERE e.ts>=? "
         "GROUP BY e.src,g.country_code,g.country_name,g.city,g.asn,g.asn_org "
-        "ORDER BY n DESC LIMIT 12", (since,))]
+        "ORDER BY n DESC LIMIT 12", (geo_version, since))]
     top_port = [{"port": port, "service": SERVICE_PORTS.get(port, "其他端口"),
                  "count": cnt} for port, cnt in conn.execute(
         "SELECT port,COUNT(*) n FROM events WHERE ts>=? AND port IS NOT NULL "
@@ -501,8 +503,9 @@ def build_status(conn, now, sizes, errors):
                "asn": asn, "asn_org": org}
               for ts, src, dst, port, proto, cc, country, city, asn, org in conn.execute(
         "SELECT e.ts,e.src,e.dst,e.port,e.proto,g.country_code,g.country_name,"
-        "g.city,g.asn,g.asn_org FROM events e LEFT JOIN geoip_cache g ON g.ip=e.src "
-        "ORDER BY e.ts DESC LIMIT 80")]
+        "g.city,g.asn,g.asn_org FROM events e LEFT JOIN geoip_cache g "
+        "ON g.ip=e.src AND g.database_version=? ORDER BY e.ts DESC LIMIT 80",
+        (geo_version,))]
     banned = [{"ip": ip, "family": fam, "expires": expiry,
                "country_code": cc, "country": country, "region": region,
                "city": city, "asn": asn, "asn_org": org}
@@ -510,13 +513,13 @@ def build_status(conn, now, sizes, errors):
               conn.execute(
         "SELECT b.ip,b.family,b.expires_at,g.country_code,g.country_name,"
         "g.region,g.city,g.asn,g.asn_org FROM bans b "
-        "LEFT JOIN geoip_cache g ON g.ip=b.ip WHERE b.expires_at>? "
-        "ORDER BY b.last_seen DESC LIMIT 120", (now,))]
+        "LEFT JOIN geoip_cache g ON g.ip=b.ip AND g.database_version=? "
+        "WHERE b.expires_at>? ORDER BY b.last_seen DESC LIMIT 120",
+        (geo_version, now))]
     bucket_start = now - now % 3600 - 23 * 3600
     buckets = dict(conn.execute(
         "SELECT (ts/3600)*3600, COUNT(*) FROM events WHERE ts >= ? GROUP BY (ts/3600)",
         (bucket_start,)))
-    geo = geoip_summary(conn, now)
     return {
         "version": "0.2.1", "updated": now, "status": "degraded" if errors else "ok",
         "errors": errors, "set_sizes": sizes, "counters": read_counters(),
