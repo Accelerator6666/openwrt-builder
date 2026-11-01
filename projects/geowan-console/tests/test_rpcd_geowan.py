@@ -211,8 +211,14 @@ class RpcLookupTests(unittest.TestCase):
             self.assertEqual(query["total"], 2)
 
     def test_list_bans_rejects_invalid_filters(self):
-        result = geowan_rpc.list_bans({"port": 70000})
-        self.assertEqual(result, {"error": "invalid_parameters"})
+        self.assertEqual(
+            geowan_rpc.list_bans({"port": 70000}),
+            {"error": "invalid_parameters"}
+        )
+        self.assertEqual(
+            geowan_rpc.list_bans({"family": 5}),
+            {"error": "invalid_parameters"}
+        )
 
     def test_get_ban_returns_geoip_and_bounded_event_history(self):
         now = 1800000000
