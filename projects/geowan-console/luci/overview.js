@@ -23,6 +23,10 @@ var getBan = rpc.declare({
     object: 'geowan', method: 'get_ban', params: [ 'ip' ]
 });
 
+var getAnalytics = rpc.declare({
+    object: 'geowan', method: 'analytics', params: [ 'period' ]
+});
+
 function timeString(epoch) {
     return epoch ? new Date(epoch * 1000).toLocaleString() : '—';
 }
@@ -370,19 +374,146 @@ function blacklistPanel() {
     return root;
 }
 
-function draw(d, lookupNode, blacklistNode) {
+function analyticsPanel() {
+    var period = E('select', { 'class': 'cbi-input-select' }, [
+        E('option', { 'value': '1h' }, '最近 1 小时'),
+        E('option', { 'value': '24h' }, '最近 24 小时'),
+        E('option', { 'value': '7d' }, '最近 7 天'),
+        E('option', { 'value': '30d' }, '最近 30 天')
+    ]);
+    period.value = '24h';
+
+    var refresh = E('button', {
+        'type': 'button', 'class': 'cbi-button cbi-button-action'
+    }, '刷新分析');
+    var summary = E('div', { 'class': 'gw-list-summary' }, '正在加载趋势分析……');
+    var metrics = E('div', { 'class': 'gw-analytics-metrics' });
+    var bars = E('div', { 'class': 'gw-bars gw-analytics-bars' });
+    var axis = E('div', { 'class': 'gw-chart-axis' });
+    var countries = E('div', {});
+    var asns = E('div', {});
+    var ports = E('div', {});
+    var protocols = E('div', {});
+    var sources = E('div', {});
+    var state = { busy: false };
+
+    function axisLabel(epoch, selectedPeriod) {
+        var date = new Date(epoch * 1000);
+        return selectedPeriod == '1h' || selectedPeriod == '24h' ?
+            date.toLocaleTimeString() : date.toLocaleDateString();
+    }
+
+    function render(data) {
+        if (data.error) {
+            dom.content(summary, '趋势分析查询失败：' + data.error);
+            dom.content(metrics, '');
+            dom.content(bars, '');
+            dom.content(countries, '');
+            dom.content(asns, '');
+            dom.content(ports, '');
+            dom.content(protocols, '');
+            dom.content(sources, '');
+            return;
+        }
+
+        dom.content(summary,
+            data.period_label + ' · ' + data.from_ts + ' 至 ' + data.to_ts +
+            ' · GeoIP 数据库 ' + data.database_version);
+
+        dom.content(metrics, [
+            card('日志事件样本', data.event_samples || 0, '受内核日志限速影响'),
+            card('唯一来源 IP', data.unique_sources || 0, '按来源地址去重'),
+            card('当前活跃黑名单', data.active_bans || 0, '当前快照，不是区间累计')
+        ]);
+
+        var points = data.trend || [];
+        var max = Math.max(1, ...points.map(function(item) {
+            return item.count || 0;
+        }));
+        dom.content(bars, points.map(function(item) {
+            return E('div', {
+                'class': 'gw-bar',
+                'title': timeString(item.time) + '：' + item.count + ' 条日志样本',
+                'style': 'height:' + Math.max(2, Math.round((item.count || 0) / max * 100)) + '%'
+            });
+        }));
+        dom.content(axis, [
+            E('span', {}, points.length ? axisLabel(points[0].time, data.period) : '—'),
+            E('span', {}, points.length ? axisLabel(points[points.length - 1].time, data.period) : '—')
+        ]);
+
+        dom.content(countries, table(['国家 / 地区', '代码', '来源 IP', '样本数'],
+            (data.top_countries || []).map(function(item) {
+                return [item.country, item.code, item.source_ips, item.samples];
+            })));
+        dom.content(asns, table(['ASN', '网络组织', '来源 IP', '样本数'],
+            (data.top_asns || []).map(function(item) {
+                return [item.asn ? 'AS' + item.asn : '', item.organization,
+                    item.source_ips, item.samples];
+            })));
+        dom.content(ports, table(['目标端口', '用途', '样本数'],
+            (data.top_ports || []).map(function(item) {
+                return [item.port, item.service, item.samples];
+            })));
+        dom.content(protocols, table(['协议', '样本数'],
+            (data.top_protocols || []).map(function(item) {
+                return [item.proto, item.samples];
+            })));
+        dom.content(sources, table(['来源 IP', '国家', '城市', 'ASN / 网络组织', '样本数'],
+            (data.top_sources || []).map(function(item) {
+                return [item.ip, item.country || item.country_code, item.city,
+                    item.asn ? 'AS' + item.asn + ' ' + (item.asn_org || '') : '',
+                    item.samples];
+            })));
+    }
+
+    function load() {
+        if (state.busy) return;
+        state.busy = true;
+        refresh.disabled = true;
+        dom.content(summary, '正在查询 ' + period.options[period.selectedIndex].text + '……');
+        getAnalytics(period.value).then(function(data) {
+            render(data);
+        }).catch(function(error) {
+            dom.content(summary, '趋势分析 RPC 失败：' + String(error));
+        }).finally(function() {
+            state.busy = false;
+            refresh.disabled = false;
+        });
+    }
+
+    period.addEventListener('change', load);
+    refresh.addEventListener('click', load);
+
+    var controls = E('div', { 'class': 'gw-analytics-controls' }, [
+        E('label', {}, ['统计范围', period]),
+        refresh
+    ]);
+
+    var root = panel('攻击趋势与来源分析', [
+        controls,
+        summary,
+        metrics,
+        bars,
+        axis,
+        E('div', { 'class': 'gw-columns gw-analytics-columns' }, [
+            panel('来源国家 / 地区（日志样本）', countries),
+            panel('来源 ASN / 网络组织（日志样本）', asns),
+            panel('目标端口（日志样本）', ports),
+            panel('协议分布（日志样本）', protocols)
+        ]),
+        panel('日志样本最多的来源 IP', sources),
+        E('p', { 'class': 'gw-muted' },
+            '统计范围仅覆盖已采集到的 GEOWAN 内核日志样本。内核日志限速可能丢弃部分记录；样本数不等于完整连接数或攻击总量。')
+    ]);
+    load();
+    return root;
+}
+
+function draw(d, lookupNode, blacklistNode, analyticsNode) {
     var counters = d.counters || {};
     var total = (counters.black4 || 0) + (counters.geo4 || 0) +
                 (counters.black6 || 0) + (counters.geo6 || 0);
-    var hours = d.hours || [];
-    var max = Math.max(1, ...hours.map(function(h) { return h.count || 0; }));
-    var bars = E('div', { 'class': 'gw-bars' }, hours.map(function(h) {
-        return E('div', {
-            'class': 'gw-bar',
-            'title': timeString(h.time) + ': ' + h.count + ' 条日志样本',
-            'style': 'height:' + Math.max(3, Math.round((h.count || 0) / max * 100)) + '%'
-        });
-    }));
     var header = E('div', { 'class': 'gw-heading' }, [
         E('div', {}, [
             E('h2', {}, 'GeoWAN 安全防护'),
@@ -405,18 +536,7 @@ function draw(d, lookupNode, blacklistNode) {
                 + ' / ' + (d.set_sizes && d.set_sizes['6'] != null ? d.set_sizes['6'] : '?'), '活跃 IP 条目数')
         ]),
         lookupNode || E('span'),
-        panel('24 小时拦截日志趋势（采样）', [
-            bars,
-            E('div', { 'class': 'gw-chart-axis' }, ['23 小时前', '当前'])
-        ]),
-        E('div', { 'class': 'gw-columns' }, [
-            panel('日志样本最多的来源', table(['来源 IP', '国家', '城市', 'ASN', '日志数'],
-                (d.top_sources || []).map(function(r) {
-                    return [r.ip, r.country || r.country_code, r.city, r.asn ? ('AS' + r.asn + ' ' + (r.asn_org || '')) : '', r.count];
-                }))),
-            panel('日志目标端口（DPT）', table(['端口', '用途', '日志样本'],
-                (d.top_ports || []).map(function(r) { return [r.port, r.service, r.count]; })))
-        ]),
+        analyticsNode || E('span'),
         E('div', { 'class': 'gw-columns' }, [
             panel('海外来源国家排行（活跃封禁 IP）', table(['国家', '国家代码', 'IP 数'],
                 (d.top_countries || []).map(function(r) { return [r.country, r.code, r.ips]; }))),
@@ -445,11 +565,12 @@ return view.extend({
     render: function(data) {
         var lookup = lookupPanel();
         var blacklist = blacklistPanel();
-        var app = draw(data, lookup, blacklist);
+        var analytics = analyticsPanel();
+        var app = draw(data, lookup, blacklist, analytics);
         var root = E('div', {}, app);
         poll.add(function() {
             return readStatus('/tmp/geowan-console/status.json').then(function(next) {
-                var refreshed = draw(dataFromRpc(next), lookup, blacklist);
+                var refreshed = draw(dataFromRpc(next), lookup, blacklist, analytics);
                 dom.content(root, refreshed);
             }).catch(function() {
                 /* Keep the last known snapshot visible during an RPC outage. */
