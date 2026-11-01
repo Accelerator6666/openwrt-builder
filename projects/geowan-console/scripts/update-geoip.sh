@@ -7,7 +7,7 @@ ROOT="/etc/geowan-console/geoip"
 RELEASE="${1:-$(date -u +%Y-%m)}"
 
 case "$RELEASE" in
-    [0-9][0-9][0-9][0-9]-[0-1][0-9]) ;;
+    [0-9][0-9][0-9][0-9]-0[1-9]|[0-9][0-9][0-9][0-9]-1[0-2]) ;;
     *) echo "Usage: $0 [YYYY-MM]"; exit 2 ;;
 esac
 
@@ -103,11 +103,29 @@ PY
 
 chmod 644 "$STAGE"/*.mmdb
 if [ -d "$RELEASE_DIR" ]; then
+    CURRENT_TARGET="$(readlink "$ROOT/current" 2>/dev/null || true)"
+    if [ "$CURRENT_TARGET" = "releases/$RELEASE" ]; then
+        echo "Refusing to replace the active release directory in place."
+        exit 1
+    fi
     rm -rf "$RELEASE_DIR"
 fi
 mv "$STAGE" "$RELEASE_DIR"
-ln -s "releases/$RELEASE" "$ROOT/.current-$$"
-mv -f "$ROOT/.current-$$" "$ROOT/current"
+/usr/bin/python3 - "$ROOT" "$RELEASE" <<'PY'
+import os
+import sys
+root, release = sys.argv[1:3]
+temporary = os.path.join(root, ".current-" + str(os.getpid()))
+current = os.path.join(root, "current")
+try:
+    os.symlink("releases/" + release, temporary)
+    os.replace(temporary, current)
+finally:
+    try:
+        os.unlink(temporary)
+    except FileNotFoundError:
+        pass
+PY
 
 echo "DB-IP Lite $RELEASE activated."
 echo "Attribution required: https://db-ip.com"
