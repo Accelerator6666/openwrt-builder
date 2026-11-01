@@ -132,10 +132,16 @@ class RpcLookupTests(unittest.TestCase):
             f"rpcd list failed: stdout={result.stdout!r}, stderr={result.stderr!r}"
         )
         methods = json.loads(result.stdout)
-        self.assertEqual(set(methods), {"lookup", "list_bans", "get_ban", "analytics"})
+        self.assertEqual(set(methods), {
+            "lookup", "list_bans", "get_ban", "analytics",
+            "source_profile", "asn_profile", "correlations"
+        })
         self.assertEqual(methods["lookup"], {"ip": ""})
         self.assertEqual(methods["get_ban"], {"ip": ""})
         self.assertEqual(methods["analytics"], {"period": "24h"})
+        self.assertEqual(methods["source_profile"], {"ip": "", "period": "24h"})
+        self.assertEqual(methods["asn_profile"], {"asn": 15169, "period": "24h"})
+        self.assertEqual(methods["correlations"], {"period": "24h"})
         self.assertEqual(methods["list_bans"]["page_size"], 50)
 
     def test_rpcd_plugin_call_protocol(self):
