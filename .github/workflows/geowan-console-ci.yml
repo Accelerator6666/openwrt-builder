@@ -19,7 +19,7 @@ jobs:
         run: python3 -m unittest discover -s projects/geowan-console/tests -v
       - name: POSIX shell syntax
         run: |
-          for file in projects/geowan-console/install.sh projects/geowan-console/uninstall.sh projects/geowan-console/scripts/*.sh; do
+          for file in projects/geowan-console/install.sh projects/geowan-console/uninstall.sh projects/geowan-console/preflight.sh projects/geowan-console/scripts/*.sh; do
             sh -n "$file"
           done
       - name: LuCI JavaScript syntax
