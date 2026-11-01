@@ -106,6 +106,43 @@ assert data.get("error") == "invalid_period", data
     exit 1
 }
 
+RPC_BAD_SOURCE_PROFILE="$(printf '%s' '{"ip":"not-an-ip","period":"24h"}' | /usr/bin/python3 "$BASE/rpcd/geowan" call source_profile)" || {
+    echo "rpcd source profile self-test failed; installation stopped."
+    exit 1
+}
+printf '%s' "$RPC_BAD_SOURCE_PROFILE" | /usr/bin/python3 -c '
+import json,sys
+data=json.load(sys.stdin)
+assert data.get("error") == "invalid_ip", data
+' || {
+    echo "rpcd source profile validation response invalid; installation stopped."
+    exit 1
+}
+RPC_BAD_ASN_PROFILE="$(printf '%s' '{"asn":0,"period":"24h"}' | /usr/bin/python3 "$BASE/rpcd/geowan" call asn_profile)" || {
+    echo "rpcd ASN profile self-test failed; installation stopped."
+    exit 1
+}
+printf '%s' "$RPC_BAD_ASN_PROFILE" | /usr/bin/python3 -c '
+import json,sys
+data=json.load(sys.stdin)
+assert data.get("error") == "invalid_asn", data
+' || {
+    echo "rpcd ASN profile validation response invalid; installation stopped."
+    exit 1
+}
+RPC_BAD_CORRELATIONS="$(printf '%s' '{"period":"all"}' | /usr/bin/python3 "$BASE/rpcd/geowan" call correlations)" || {
+    echo "rpcd correlations self-test failed; installation stopped."
+    exit 1
+}
+printf '%s' "$RPC_BAD_CORRELATIONS" | /usr/bin/python3 -c '
+import json,sys
+data=json.load(sys.stdin)
+assert data.get("error") == "invalid_period", data
+' || {
+    echo "rpcd correlations validation response invalid; installation stopped."
+    exit 1
+}
+
 echo "rpcd plugin self-tests passed."
 
 # Stop an existing v0.2 monitor before replacing its executable or service file.
