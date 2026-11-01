@@ -29,9 +29,11 @@ def _open_readonly(db_path):
 
 def _optional_int(request, key, minimum, maximum):
     value = request.get(key)
-    if value in (None, "", 0, "0"):
+    if isinstance(value, bool):
+        raise ValueError(key)
+    if value is None or value == "" or value == 0 or value == "0":
         return None
-    if isinstance(value, bool) or not isinstance(value, int):
+    if not isinstance(value, int):
         raise ValueError(key)
     if value < minimum or value > maximum:
         raise ValueError(key)
@@ -57,6 +59,8 @@ def _filters(request):
         raise ValueError("page_size")
 
     family = _optional_int(request, "family", 4, 6)
+    if family not in (None, 4, 6):
+        raise ValueError("family")
     query = request.get("query", "")
     if not isinstance(query, str) or len(query) > 96 or "\x00" in query:
         raise ValueError("query")
