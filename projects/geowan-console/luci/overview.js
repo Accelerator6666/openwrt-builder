@@ -9,6 +9,10 @@ var readStatus = rpc.declare({
     expect: { data: '' }
 });
 
+var lookupIp = rpc.declare({
+    object: 'geowan', method: 'lookup', params: [ 'ip' ]
+});
+
 function timeString(epoch) {
     return epoch ? new Date(epoch * 1000).toLocaleString() : '—';
 }
@@ -47,6 +51,69 @@ function panel(title, body) {
     else if (body != null)
         children.push(body);
     return E('section', { 'class': 'gw-panel' }, children);
+}
+
+
+
+function lookupPanel() {
+    var input = E('input', {
+        'type': 'text',
+        'class': 'cbi-input-text',
+        'placeholder': '输入公网 IPv4 或 IPv6 地址',
+        'autocomplete': 'off',
+        'spellcheck': 'false'
+    });
+    var button = E('button', {
+        'type': 'button',
+        'class': 'cbi-button cbi-button-action'
+    }, '查询归属地');
+    var result = E('div', { 'class': 'gw-lookup-result' }, '输入 IP 地址后查询本地离线数据库。');
+    function runLookup() {
+        var value = input.value.trim();
+        if (!value) {
+            dom.content(result, '请输入 IP 地址。');
+            return;
+        }
+        button.disabled = true;
+        dom.content(result, '正在查询……');
+        lookupIp(value).then(function(data) {
+            button.disabled = false;
+            if (data.error) {
+                dom.content(result, '查询失败：' + data.error);
+                return;
+            }
+            if (data.lookup_status != 'ok') {
+                var labels = {
+                    invalid: 'IP 地址格式不正确',
+                    non_global: '这是非公网地址，不进行公网归属地定位',
+                    unavailable: 'GeoIP 数据库或 MMDB Reader 尚未安装',
+                    not_found: '数据库中没有匹配记录'
+                };
+                dom.content(result, labels[data.lookup_status] || '未能取得归属信息');
+                return;
+            }
+            dom.content(result, table(['字段', '查询结果'], [
+                ['IP 地址', data.ip],
+                ['国家 / 地区', (data.country_name || '未知') + (data.country_code ? ' (' + data.country_code + ')' : '')],
+                ['大洲', data.continent_name || data.continent_code],
+                ['省份 / 州', data.region],
+                ['城市', data.city],
+                ['ASN', data.asn ? 'AS' + data.asn : ''],
+                ['网络组织', data.asn_org],
+                ['数据源', data.provider + ' · ' + data.database_version]
+            ]));
+        }).catch(function(error) {
+            button.disabled = false;
+            dom.content(result, 'RPC 查询失败：' + String(error));
+        });
+    }
+    button.addEventListener('click', runLookup);
+    input.addEventListener('keydown', function(event) {
+        if (event.key == 'Enter')
+            runLookup();
+    });
+    return panel('IP 归属地查询（本地离线数据库）',
+        E('div', { 'class': 'gw-lookup' }, [input, button, result]));
 }
 
 function draw(d) {
@@ -123,10 +190,15 @@ return view.extend({
         return readStatus('/tmp/geowan-console/status.json').then(dataFromRpc);
     },
     render: function(data) {
-        var root = E('div', {}, draw(data));
+        var lookup = lookupPanel();
+        var app = draw(data);
+        app.appendChild(lookup);
+        var root = E('div', {}, app);
         poll.add(function() {
             return readStatus('/tmp/geowan-console/status.json').then(function(next) {
-                dom.content(root, draw(dataFromRpc(next)));
+                var refreshed = draw(dataFromRpc(next));
+                refreshed.appendChild(lookup);
+                dom.content(root, refreshed);
             }).catch(function() {
                 /* Keep the last known snapshot visible during an RPC outage. */
             });
