@@ -41,9 +41,12 @@ function table(headers, rows) {
 }
 
 function panel(title, body) {
-    return E('section', { 'class': 'gw-panel' }, [
-        E('h3', {}, title), body
-    ]);
+    var children = [ E('h3', {}, title) ];
+    if (Array.isArray(body))
+        children = children.concat(body);
+    else if (body != null)
+        children.push(body);
+    return E('section', { 'class': 'gw-panel' }, children);
 }
 
 function draw(d) {
