@@ -40,7 +40,7 @@ if [ -x /etc/init.d/geowan-monitor ]; then
 fi
 
 mkdir -p /usr/libexec/geowan-console \
-    /usr/share/luci/menu.d /usr/share/rpcd/acl.d \
+    /usr/share/luci/menu.d /usr/share/rpcd/acl.d /usr/libexec/rpcd \
     /www/luci-static/resources/view/geowan \
     /www/luci-static/resources/geowan \
     /etc/geowan-console /tmp/geowan-console
@@ -48,6 +48,8 @@ chmod 700 /etc/geowan-console
 
 cp "$BASE/agent/geowan_agent.py" /usr/libexec/geowan-console/agent.py
 cp "$BASE/agent/geowan_geoip.py" /usr/libexec/geowan-console/geowan_geoip.py
+cp "$BASE/agent/geowan_rpc.py" /usr/libexec/geowan-console/geowan_rpc.py
+cp "$BASE/rpcd/geowan" /usr/libexec/rpcd/geowan
 cp "$BASE/scripts/task.sh" /usr/libexec/geowan-console/task.sh
 cp "$BASE/scripts/update.sh" /usr/libexec/geowan-console/update.sh
 cp "$BASE/scripts/update-geoip.sh" /usr/libexec/geowan-console/update-geoip.sh
@@ -62,6 +64,7 @@ chmod 700 /usr/libexec/geowan-console/agent.py \
     /usr/libexec/geowan-console/task.sh \
     /usr/libexec/geowan-console/update.sh \
     /usr/libexec/geowan-console/update-geoip.sh
+chmod 755 /usr/libexec/rpcd/geowan
 chmod 755 /etc/init.d/geowan-console
 chmod 755 /etc/init.d/geowan-monitor
 chmod 644 /usr/share/luci/menu.d/luci-app-geowan-console.json \
