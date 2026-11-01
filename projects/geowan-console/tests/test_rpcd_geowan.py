@@ -1,4 +1,6 @@
+import json
 import sqlite3
+import subprocess
 import sys
 from pathlib import Path
 import tempfile
@@ -61,6 +63,23 @@ class RpcLookupTests(unittest.TestCase):
                 )
             self.assertEqual(result["country_code"], "US")
             self.assertEqual(result["asn"], 15169)
+
+    def test_rpcd_plugin_list_protocol(self):
+        plugin = Path(__file__).resolve().parents[1] / "rpcd" / "geowan"
+        result = subprocess.run(
+            [sys.executable, str(plugin), "list"],
+            check=True, capture_output=True, text=True
+        )
+        self.assertEqual(json.loads(result.stdout), {"lookup": {"ip": ""}})
+
+    def test_rpcd_plugin_call_protocol(self):
+        plugin = Path(__file__).resolve().parents[1] / "rpcd" / "geowan"
+        result = subprocess.run(
+            [sys.executable, str(plugin), "call", "lookup"],
+            input='{"ip":"10.0.0.1"}',
+            check=True, capture_output=True, text=True
+        )
+        self.assertEqual(json.loads(result.stdout)["lookup_status"], "non_global")
 
     def test_uncached_lookup_uses_local_resolver(self):
         with tempfile.TemporaryDirectory() as tmp:
