@@ -1,0 +1,42 @@
+name: GeoWAN Console CI
+
+on:
+  push:
+    branches:
+      - feature/geowan-console-v0.2
+    paths:
+      - "projects/geowan-console/**"
+      - ".github/workflows/geowan-console.yml"
+  pull_request:
+    paths:
+      - "projects/geowan-console/**"
+      - ".github/workflows/geowan-console.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Python unit tests
+        run: python -m unittest discover -s projects/geowan-console/tests -v
+
+      - name: Python syntax
+        run: python -m py_compile projects/geowan-console/agent/geowan_agent.py
+
+      - name: Shell syntax
+        run: |
+          cd projects/geowan-console
+          sh -n install.sh
+          sh -n uninstall.sh
+          sh -n preflight.sh
+          for f in scripts/*.sh; do sh -n "$f"; done
+
+      - name: LuCI JavaScript syntax
+        run: node --check projects/geowan-console/luci/overview.js
