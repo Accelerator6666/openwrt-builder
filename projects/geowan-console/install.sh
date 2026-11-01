@@ -69,8 +69,8 @@ chmod 644 /usr/share/luci/menu.d/luci-app-geowan-console.json \
     /www/luci-static/resources/view/geowan/overview.js \
     /www/luci-static/resources/geowan/geowan.css
 
-# Collection only. Weekly GeoIP refresh is deliberately NOT scheduled until
-# the existing update-geowan.sh passes nft/fw4 validation on this router.
+# Keep GeoIP downloads manual until the DB-IP release and local reader are
+# validated on this router; telemetry reconciliation remains scheduled.
 grep -Fq '# geowan-console-collect' /etc/crontabs/root 2>/dev/null || \
   echo '*/5 * * * * /usr/libexec/geowan-console/task.sh >/tmp/geowan-console-cron.log 2>&1 # geowan-console-collect' >> /etc/crontabs/root
 
