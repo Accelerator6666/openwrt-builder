@@ -18,7 +18,7 @@ import subprocess
 import tempfile
 import time
 
-from geowan_geoip import GeoIPResolver, read_metadata
+from geowan_geoip import GEOIP_DIR, GeoIPResolver, read_metadata
 
 DB = Path(os.environ.get("GEOWAN_DB", "/etc/geowan-console/telemetry.sqlite3"))
 STATUS = Path(os.environ.get("GEOWAN_STATUS", "/tmp/geowan-console/status.json"))
@@ -323,7 +323,7 @@ def geoip_summary(conn, now):
     version = str(metadata.get("release") or "unknown")
     provider = str(metadata.get("provider") or "DB-IP Lite")
     files_present = any(
-        (Path("/etc/geowan-console/geoip/current") / filename).is_file()
+        (GEOIP_DIR / filename).is_file()
         for filename in ("country.mmdb", "city.mmdb", "asn.mmdb")
     )
     active = conn.execute(
