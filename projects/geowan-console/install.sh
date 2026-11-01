@@ -43,9 +43,10 @@ RPC_LIST="$(/usr/bin/python3 "$BASE/rpcd/geowan" list)" || {
 printf '%s' "$RPC_LIST" | /usr/bin/python3 -c '
 import json,sys
 data=json.load(sys.stdin)
-assert set(data) == {"lookup","list_bans","get_ban"}, data
+assert set(data) == {"lookup","list_bans","get_ban","analytics"}, data
 assert data["lookup"] == {"ip":""}, data
 assert data["get_ban"] == {"ip":""}, data
+assert data["analytics"] == {"period":"24h"}, data
 assert data["list_bans"]["page_size"] == 50, data
 ' || {
     echo "rpcd plugin list response invalid; installation stopped."
@@ -89,6 +90,19 @@ assert data.get("error") == "invalid_ip", data
     echo "rpcd detail validation response invalid; installation stopped."
     exit 1
 }
+RPC_BAD_ANALYTICS="$(printf '%s' '{"period":"all"}' | /usr/bin/python3 "$BASE/rpcd/geowan" call analytics)" || {
+    echo "rpcd analytics self-test failed; installation stopped."
+    exit 1
+}
+printf '%s' "$RPC_BAD_ANALYTICS" | /usr/bin/python3 -c '
+import json,sys
+data=json.load(sys.stdin)
+assert data.get("error") == "invalid_period", data
+' || {
+    echo "rpcd analytics validation response invalid; installation stopped."
+    exit 1
+}
+
 echo "rpcd plugin self-tests passed."
 
 # Stop an existing v0.2 monitor before replacing its executable or service file.
