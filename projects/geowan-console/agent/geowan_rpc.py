@@ -3,7 +3,7 @@ import ipaddress
 import sqlite3
 from pathlib import Path
 
-from geowan_geoip import GEOIP_DIR, GeoIPResolver, read_metadata
+from geowan_geoip import GeoIPResolver, read_metadata
 
 DB = Path("/etc/geowan-console/telemetry.sqlite3")
 
@@ -20,6 +20,7 @@ def lookup(request, db_path=DB, resolver_factory=GeoIPResolver):
 
     version = str(read_metadata().get("release") or "unknown")
     if address.is_global:
+        conn = None
         try:
             conn = sqlite3.connect(
                 "file:" + str(db_path) + "?mode=ro", uri=True, timeout=2
@@ -30,7 +31,6 @@ def lookup(request, db_path=DB, resolver_factory=GeoIPResolver):
                 "FROM geoip_cache WHERE ip=?",
                 (str(address),)
             ).fetchone()
-            conn.close()
             if row and row[9] == version:
                 keys = (
                     "country_code", "country_name", "continent_code",
@@ -40,6 +40,9 @@ def lookup(request, db_path=DB, resolver_factory=GeoIPResolver):
                 return {"ip": str(address), **dict(zip(keys, row))}
         except (OSError, sqlite3.Error):
             pass
+        finally:
+            if conn is not None:
+                conn.close()
 
     resolver = resolver_factory()
     try:
