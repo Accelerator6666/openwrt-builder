@@ -547,7 +547,7 @@ function draw(d, lookupNode, blacklistNode, analyticsNode) {
         E('div', { 'class': 'gw-columns' }, [
             panel('海外来源国家排行（活跃封禁 IP）', table(['国家', '国家代码', 'IP 数'],
                 (d.top_countries || []).map(function(r) { return [r.country, r.code, r.ips]; }))),
-            panel('来源 ASN / 网络组织排行', table(['ASN', '网络组织', 'IP 数'],
+            panel('来源 ASN / 网络组织排行（活跃封禁 IP）', table(['ASN', '网络组织', 'IP 数'],
                 (d.top_asns || []).map(function(r) { return [r.asn ? ('AS' + r.asn) : '', r.organization, r.ips]; })))
         ]),
         panel('最近的拒绝记录（日志样本）', table(['时间', '来源 IP', '国家', '城市', '目标 IP', '目标端口', '协议'],
