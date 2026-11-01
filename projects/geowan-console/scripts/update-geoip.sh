@@ -134,6 +134,27 @@ finally:
         pass
 PY
 
+# Keep the active release and the newest previous release for rollback.
+# Older versions are removed only after the new symlink has been activated.
+/usr/bin/python3 - "$ROOT" <<'PY'
+import os
+import shutil
+import sys
+root = sys.argv[1]
+releases = os.path.join(root, "releases")
+current_target = os.readlink(os.path.join(root, "current"))
+entries = sorted(
+    [name for name in os.listdir(releases)
+     if os.path.isdir(os.path.join(releases, name))],
+    reverse=True
+)
+keep = set(entries[:2])
+keep.add(os.path.basename(current_target.rstrip("/")))
+for name in entries:
+    if name not in keep:
+        shutil.rmtree(os.path.join(releases, name), ignore_errors=True)
+PY
+
 echo "DB-IP Lite $RELEASE activated."
 echo "Attribution required: https://db-ip.com"
 
