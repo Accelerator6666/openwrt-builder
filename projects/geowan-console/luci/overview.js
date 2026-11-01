@@ -250,7 +250,14 @@ function blacklistPanel() {
         ]);
         getBan(ip).then(function(data) {
             if (requestId !== state.detailRequest) return;
-            if (data.error || !data.found) {
+            if (data.error) {
+                dom.content(detail, [
+                    detailHeading(ip),
+                    E('p', {}, '详情查询失败：' + data.error)
+                ]);
+                return;
+            }
+            if (!data.found) {
                 dom.content(detail, [
                     detailHeading(ip),
                     E('p', {}, '未找到该 IP 的封禁记录。')
@@ -311,7 +318,7 @@ function blacklistPanel() {
         dom.content(summary,
             '共 ' + data.total + ' 条活跃封禁记录 · 第 ' + data.page +
             ' / ' + state.pages + ' 页 · 每页 ' + data.page_size + ' 条。' +
-            '端口 / 协议筛选基于内核日志样本。');
+            '端口 / 协议筛选基于内核日志样本；剩余封禁时间按本次查询时刻计算。');
 
         var rows = (data.items || []).map(function(item) {
             var location = [item.region, item.city].filter(Boolean).join(' / ');
