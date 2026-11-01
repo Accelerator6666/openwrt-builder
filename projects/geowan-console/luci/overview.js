@@ -159,7 +159,7 @@ function draw(d, lookupNode) {
                 (d.top_sources || []).map(function(r) {
                     return [r.ip, r.country || r.country_code, r.city, r.asn ? ('AS' + r.asn + ' ' + (r.asn_org || '')) : '', r.count];
                 }))),
-            panel('目标端口（公网 DNAT 前）', table(['端口', '用途', '日志样本'],
+            panel('日志目标端口（DPT）', table(['端口', '用途', '日志样本'],
                 (d.top_ports || []).map(function(r) { return [r.port, r.service, r.count]; })))
         ]),
         E('div', { 'class': 'gw-columns' }, [
