@@ -25,6 +25,10 @@ if [ -L "$ROOT/current" ] &&
 fi
 
 mkdir -p "$ROOT/releases"
+if [ -e "$ROOT/current" ] && [ ! -L "$ROOT/current" ]; then
+    echo "GeoIP current path exists and is not a symlink; refusing to replace it."
+    exit 1
+fi
 STAGE="$ROOT/.staging-$RELEASE-$$"
 RELEASE_DIR="$ROOT/releases/$RELEASE"
 mkdir -m 700 "$STAGE"
