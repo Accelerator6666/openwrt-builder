@@ -18,6 +18,8 @@ import subprocess
 import tempfile
 import time
 
+from geowan_geoip import GeoIPResolver, read_metadata
+
 DB = Path(os.environ.get("GEOWAN_DB", "/etc/geowan-console/telemetry.sqlite3"))
 STATUS = Path(os.environ.get("GEOWAN_STATUS", "/tmp/geowan-console/status.json"))
 MAX_TTL = 7 * 86400
@@ -54,11 +56,21 @@ def db_open():
         first_seen INTEGER NOT NULL, last_seen INTEGER NOT NULL,
         expires_at INTEGER NOT NULL
     )""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS geoip_cache(
+        ip TEXT PRIMARY KEY, country_code TEXT NOT NULL DEFAULT '',
+        country_name TEXT NOT NULL DEFAULT '', continent_code TEXT NOT NULL DEFAULT '',
+        continent_name TEXT NOT NULL DEFAULT '', region TEXT NOT NULL DEFAULT '',
+        city TEXT NOT NULL DEFAULT '', asn INTEGER, asn_org TEXT NOT NULL DEFAULT '',
+        provider TEXT NOT NULL DEFAULT '', database_version TEXT NOT NULL DEFAULT '',
+        lookup_status TEXT NOT NULL, updated_at INTEGER NOT NULL
+    )""")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_bans_expires ON bans(expires_at)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_bans_last_seen ON bans(last_seen DESC)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_events_src_ts ON events(src,ts)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_events_port_ts ON events(port,ts)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_geoip_country ON geoip_cache(country_code)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_geoip_asn ON geoip_cache(asn)")
     conn.commit()
     return conn
 
@@ -262,6 +274,107 @@ def publish_status(status):
             os.unlink(name)
 
 
+
+def enrich_pending(conn, resolver, now=None, limit=250):
+    """Resolve a bounded batch of active bans; no network API calls are made."""
+    if resolver is None or not resolver.available:
+        return 0
+    now = int(time.time()) if now is None else int(now)
+    version = resolver.version
+    rows = conn.execute(
+        "SELECT b.ip FROM bans b LEFT JOIN geoip_cache g ON g.ip=b.ip "
+        "WHERE b.expires_at>? AND (g.ip IS NULL OR g.database_version<>?) "
+        "ORDER BY b.first_seen,b.ip LIMIT ?",
+        (now, version, max(1, int(limit)))
+    ).fetchall()
+    saved = 0
+    for (ip,) in rows:
+        item = resolver.lookup(ip)
+        conn.execute(
+            """INSERT INTO geoip_cache(
+                ip,country_code,country_name,continent_code,continent_name,
+                region,city,asn,asn_org,provider,database_version,
+                lookup_status,updated_at
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(ip) DO UPDATE SET
+                country_code=excluded.country_code,
+                country_name=excluded.country_name,
+                continent_code=excluded.continent_code,
+                continent_name=excluded.continent_name,
+                region=excluded.region,city=excluded.city,asn=excluded.asn,
+                asn_org=excluded.asn_org,provider=excluded.provider,
+                database_version=excluded.database_version,
+                lookup_status=excluded.lookup_status,updated_at=excluded.updated_at""",
+            (
+                ip, item.get("country_code", ""), item.get("country_name", ""),
+                item.get("continent_code", ""), item.get("continent_name", ""),
+                item.get("region", ""), item.get("city", ""), item.get("asn"),
+                item.get("asn_org", ""), item.get("provider", ""),
+                item.get("database_version", version),
+                item.get("lookup_status", "not_found"), now
+            )
+        )
+        saved += 1
+    return saved
+
+
+def geoip_summary(conn, now):
+    metadata = read_metadata()
+    version = str(metadata.get("release") or "unknown")
+    provider = str(metadata.get("provider") or "DB-IP Lite")
+    files_present = any(
+        (Path("/etc/geowan-console/geoip/current") / filename).is_file()
+        for filename in ("country.mmdb", "city.mmdb", "asn.mmdb")
+    )
+    active = conn.execute(
+        "SELECT COUNT(*) FROM bans WHERE expires_at>?", (now,)
+    ).fetchone()[0]
+    resolved = conn.execute(
+        "SELECT COUNT(*) FROM bans b JOIN geoip_cache g ON g.ip=b.ip "
+        "WHERE b.expires_at>? AND g.database_version=? "
+        "AND g.lookup_status='ok'", (now, version)
+    ).fetchone()[0]
+    pending = conn.execute(
+        "SELECT COUNT(*) FROM bans b LEFT JOIN geoip_cache g ON g.ip=b.ip "
+        "WHERE b.expires_at>? AND (g.ip IS NULL OR g.database_version<>?)",
+        (now, version)
+    ).fetchone()[0]
+    countries = [{"code": code, "country": name, "ips": count} for code, name, count
+                 in conn.execute(
+        "SELECT g.country_code,g.country_name,COUNT(*) FROM bans b "
+        "JOIN geoip_cache g ON g.ip=b.ip WHERE b.expires_at>? "
+        "AND g.database_version=? AND g.lookup_status='ok' "
+        "AND g.country_code<>'' GROUP BY g.country_code,g.country_name "
+        "ORDER BY COUNT(*) DESC LIMIT 20", (now, version))]
+    asns = [{"asn": asn, "organization": org, "ips": count} for asn, org, count
+            in conn.execute(
+        "SELECT g.asn,g.asn_org,COUNT(*) FROM bans b JOIN geoip_cache g ON g.ip=b.ip "
+        "WHERE b.expires_at>? AND g.database_version=? AND g.lookup_status='ok' "
+        "AND g.asn IS NOT NULL GROUP BY g.asn,g.asn_org "
+        "ORDER BY COUNT(*) DESC LIMIT 20", (now, version))]
+    return {
+        "enabled": bool(files_present),
+        "provider": provider,
+        "database_version": version,
+        "attribution_url": "https://db-ip.com",
+        "active_bans": active,
+        "resolved_active_bans": resolved,
+        "pending_active_bans": pending,
+        "top_countries": countries,
+        "top_asns": asns
+    }
+
+
+def lookup_ip(value):
+    resolver = GeoIPResolver()
+    try:
+        print(json.dumps(resolver.lookup(value), ensure_ascii=False, indent=2))
+        if not resolver.available:
+            raise SystemExit(2)
+    finally:
+        resolver.close()
+
+
 def monitor_cycle(state, conn):
     """Run one fast telemetry cycle; never alter nftables rules or DNAT."""
     try:
@@ -281,6 +394,10 @@ def monitor_cycle(state, conn):
         if state["last_log_mono"] == 0 or mono - state["last_log_mono"] >= LOG_SCAN_INTERVAL:
             insert_log_samples(conn, now)
             state["last_log_mono"] = mono
+        resolver = state.get("geoip_resolver")
+        if resolver and resolver.available and mono - state["last_geoip_mono"] >= 15:
+            state["geoip_enriched"] = enrich_pending(conn, resolver, now, limit=250)
+            state["last_geoip_mono"] = mono
         conn.commit()
         status = build_status(conn, now, state["sizes"], state["errors"])
         status["collector"] = {
@@ -306,7 +423,10 @@ def monitor():
         "errors": [],
         "last_inventory": 0,
         "last_inventory_mono": 0.0,
-        "last_log_mono": 0.0
+        "last_log_mono": 0.0,
+        "last_geoip_mono": 0.0,
+        "geoip_enriched": 0,
+        "geoip_resolver": GeoIPResolver()
     }
     stopping = False
 
@@ -334,16 +454,20 @@ def monitor():
                 time.sleep(delay)
     finally:
         conn.close()
+        state["geoip_resolver"].close()
     print("GeoWAN fast monitor stopped", flush=True)
 
 
 def collect():
     now = int(time.time())
     conn = db_open()
+    resolver = GeoIPResolver()
     with conn:
         sizes, errors = snapshot(conn, now)
         insert_log_samples(conn, now)
+        enrich_pending(conn, resolver, now, limit=250)
     status = build_status(conn, now, sizes, errors)
+    resolver.close()
     status["collector"] = {
         "mode": "reconcile",
         "counter_interval_seconds": None,
@@ -421,8 +545,14 @@ def restore():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("collect", "restore", "monitor"))
+    parser.add_argument("action", choices=("collect", "restore", "monitor", "lookup"))
+    parser.add_argument("ip", nargs="?")
     args = parser.parse_args()
+    if args.action == "lookup":
+        if not args.ip:
+            parser.error("lookup requires an IP address")
+        lookup_ip(args.ip)
+        return
     if args.action == "collect":
         collect()
     elif args.action == "restore":
