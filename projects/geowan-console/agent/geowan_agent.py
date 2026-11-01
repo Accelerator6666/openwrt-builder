@@ -485,31 +485,48 @@ def build_status(conn, now, sizes, errors):
     since = now - 86400
     total = conn.execute("SELECT COUNT(*) FROM events WHERE ts>=?", (since,)).fetchone()[0]
     active = conn.execute("SELECT COUNT(*) FROM bans WHERE expires_at>?", (now,)).fetchone()[0]
-    top_ip = [{"ip": ip, "count": cnt} for ip, cnt in conn.execute(
-        "SELECT src,COUNT(*) n FROM events WHERE ts>=? GROUP BY src ORDER BY n DESC LIMIT 12",
-        (since,))]
+    top_ip = [{"ip": ip, "count": cnt, "country_code": cc,
+                "country": country, "city": city, "asn": asn,
+                "asn_org": org} for ip, cnt, cc, country, city, asn, org in conn.execute(
+        "SELECT e.src,COUNT(*) n,g.country_code,g.country_name,g.city,g.asn,g.asn_org "
+        "FROM events e LEFT JOIN geoip_cache g ON g.ip=e.src WHERE e.ts>=? "
+        "GROUP BY e.src,g.country_code,g.country_name,g.city,g.asn,g.asn_org "
+        "ORDER BY n DESC LIMIT 12", (since,))]
     top_port = [{"port": port, "service": SERVICE_PORTS.get(port, "其他端口"),
                  "count": cnt} for port, cnt in conn.execute(
         "SELECT port,COUNT(*) n FROM events WHERE ts>=? AND port IS NOT NULL "
         "GROUP BY port ORDER BY n DESC LIMIT 12", (since,))]
-    events = [{"time": ts, "src": src, "dst": dst, "port": port, "proto": proto}
-              for ts, src, dst, port, proto in conn.execute(
-        "SELECT ts,src,dst,port,proto FROM events ORDER BY ts DESC LIMIT 80")]
-    banned = [{"ip": ip, "family": fam, "expires": expiry} for ip, fam, expiry in
-              conn.execute("SELECT ip,family,expires_at FROM bans WHERE expires_at>? "
-                           "ORDER BY last_seen DESC LIMIT 120", (now,))]
+    events = [{"time": ts, "src": src, "dst": dst, "port": port, "proto": proto,
+               "country_code": cc, "country": country, "city": city,
+               "asn": asn, "asn_org": org}
+              for ts, src, dst, port, proto, cc, country, city, asn, org in conn.execute(
+        "SELECT e.ts,e.src,e.dst,e.port,e.proto,g.country_code,g.country_name,"
+        "g.city,g.asn,g.asn_org FROM events e LEFT JOIN geoip_cache g ON g.ip=e.src "
+        "ORDER BY e.ts DESC LIMIT 80")]
+    banned = [{"ip": ip, "family": fam, "expires": expiry,
+               "country_code": cc, "country": country, "region": region,
+               "city": city, "asn": asn, "asn_org": org}
+              for ip, fam, expiry, cc, country, region, city, asn, org in
+              conn.execute(
+        "SELECT b.ip,b.family,b.expires_at,g.country_code,g.country_name,"
+        "g.region,g.city,g.asn,g.asn_org FROM bans b "
+        "LEFT JOIN geoip_cache g ON g.ip=b.ip WHERE b.expires_at>? "
+        "ORDER BY b.last_seen DESC LIMIT 120", (now,))]
     bucket_start = now - now % 3600 - 23 * 3600
     buckets = dict(conn.execute(
         "SELECT (ts/3600)*3600, COUNT(*) FROM events WHERE ts >= ? GROUP BY (ts/3600)",
         (bucket_start,)))
+    geo = geoip_summary(conn, now)
     return {
-        "version": "0.2.0", "updated": now, "status": "degraded" if errors else "ok",
+        "version": "0.2.1", "updated": now, "status": "degraded" if errors else "ok",
         "errors": errors, "set_sizes": sizes, "counters": read_counters(),
         "active_bans": active, "samples_24h": total, "top_sources": top_ip,
         "top_ports": top_port, "events": events, "blacklist": banned,
+        "top_countries": geo["top_countries"], "top_asns": geo["top_asns"],
+        "geoip": geo,
         "hours": [{"time": ts, "count": buckets.get(ts, 0)}
                   for ts in range(bucket_start, bucket_start + 24 * 3600, 3600)],
-        "disclaimer": "事件和排行来自内核限速日志样本；包计数仅代表本次防火墙加载后的命中量。"
+        "disclaimer": "事件和来源排行来自内核限速日志样本；国家/ASN 排行按活跃封禁 IP 去重；GeoIP 归属仅代表网络注册信息，不代表人员真实位置。"
     }
 
 
