@@ -19,8 +19,8 @@ elif sys.argv[1] == "call" and len(sys.argv) >= 3:
         request = json.load(sys.stdin)
         response = dispatch(sys.argv[2], request)
         print(json.dumps(response, ensure_ascii=False, separators=(",", ":")))
-    except Exception as exc:
-        print(json.dumps({"error": str(exc)}, ensure_ascii=False))
+    except Exception:
+        print(json.dumps({"error": "lookup_failed"}))
         raise SystemExit(1)
 else:
     raise SystemExit(2)
