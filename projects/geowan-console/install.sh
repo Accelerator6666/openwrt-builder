@@ -34,6 +34,35 @@ fw4 check >/dev/null || {
     exit 1
 }
 
+# Validate the rpcd executable against the source checkout before touching
+# installed files or services. This catches stale v0.1 module directories.
+RPC_LIST="$(/usr/bin/python3 "$BASE/rpcd/geowan" list)" || {
+    echo "rpcd plugin list self-test failed; installation stopped."
+    exit 1
+}
+printf '%s' "$RPC_LIST" | /usr/bin/python3 -c '
+import json,sys
+data=json.load(sys.stdin)
+assert data == {"lookup":{"ip":""}}, data
+' || {
+    echo "rpcd plugin list response invalid; installation stopped."
+    exit 1
+}
+
+RPC_PRIVATE="$(printf '%s' '{"ip":"10.0.0.1"}' | /usr/bin/python3 "$BASE/rpcd/geowan" call lookup)" || {
+    echo "rpcd plugin call self-test failed; installation stopped."
+    exit 1
+}
+printf '%s' "$RPC_PRIVATE" | /usr/bin/python3 -c '
+import json,sys
+data=json.load(sys.stdin)
+assert data.get("lookup_status") == "non_global", data
+' || {
+    echo "rpcd plugin call response invalid; installation stopped."
+    exit 1
+}
+echo "rpcd plugin self-tests passed."
+
 # Stop an existing v0.2 monitor before replacing its executable or service file.
 if [ -x /etc/init.d/geowan-monitor ]; then
     /etc/init.d/geowan-monitor stop 2>/dev/null || :
