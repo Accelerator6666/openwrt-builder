@@ -217,7 +217,7 @@ function blacklistPanel() {
                 ['地区 / 城市', location],
                 ['ASN', item.asn ? 'AS' + item.asn : ''],
                 ['网络组织', item.asn_org],
-                ['GeoIP 数据库', item.provider + ' · ' + item.database_version],
+                ['GeoIP 数据库', (item.provider || '—') + ' · ' + (item.database_version || '—')],
                 ['归属查询状态', item.lookup_status],
                 ['首次发现', timeString(item.first_seen)],
                 ['最近发现', timeString(item.last_seen)],
