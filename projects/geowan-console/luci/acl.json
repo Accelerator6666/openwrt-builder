@@ -1,0 +1,17 @@
+{
+  "luci-app-geowan-console": {
+    "description": "Read sanitized GeoWAN dashboard data",
+    "read": {
+      "ubus": {
+        "file": [
+          "read"
+        ]
+      },
+      "file": {
+        "/tmp/geowan-console/status.json": [
+          "read"
+        ]
+      }
+    }
+  }
+}
