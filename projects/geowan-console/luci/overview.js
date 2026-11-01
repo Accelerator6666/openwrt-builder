@@ -77,6 +77,7 @@ function draw(d) {
             card('活跃黑名单记录', d.active_bans || 0, 'IPv4 / IPv6 · 过期自动释放'),
             card('本次规则加载以来丢弃包', total, 'nftables counter，非历史累计'),
             card('过去 24 小时日志样本', d.samples_24h || 0, '受内核日志限速影响'),
+            card('监控数据更新', timeString(d.updated), d.collector && d.collector.mode == 'fast' ? '快速监控运行中' : '定时对账模式'),
             card('IPv4 / IPv6 集合', (d.set_sizes && d.set_sizes['4'] != null ? d.set_sizes['4'] : '?')
                 + ' / ' + (d.set_sizes && d.set_sizes['6'] != null ? d.set_sizes['6'] : '?'), '活跃 IP 条目数')
         ]),
@@ -100,7 +101,8 @@ function draw(d) {
             }))),
         (d.errors || []).length ? E('p', { 'class': 'gw-error' }, d.errors.join('；')) : E('span'),
         E('div', { 'class': 'gw-footer' }, [
-            '更新：' + timeString(d.updated) + ' · ',
+            '更新：' + timeString(d.updated) + ' · ' +
+            (d.collector ? ('采集：' + d.collector.mode + ' · 黑名单扫描：' + d.collector.inventory_interval_seconds + ' 秒 · ') : ''),
             d.disclaimer || '统计数据仅供防火墙运维使用。'
         ])
     ]);
@@ -118,7 +120,7 @@ return view.extend({
             }).catch(function() {
                 /* Keep the last known snapshot visible during an RPC outage. */
             });
-        }, 30);
+        }, 5);
         return root;
     },
     handleSaveApply: null,
