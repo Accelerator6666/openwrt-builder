@@ -325,6 +325,10 @@ def monitor():
                 monitor_cycle(state, conn)
             except Exception as exc:
                 print(f"GeoWAN monitor cycle failed: {exc}", flush=True)
+                try:
+                    conn.rollback()
+                except sqlite3.Error:
+                    pass
             delay = max(0.0, MONITOR_INTERVAL - (time.monotonic() - started))
             if not stopping:
                 time.sleep(delay)
