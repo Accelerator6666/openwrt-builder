@@ -299,9 +299,9 @@ def asn_profile(request, db_path=DB, now=None):
         )
         params = [version, value, since, now]
         summary = conn.execute(
-            "SELECT COUNT(*) AS samples,COUNT(DISTINCT e.src) AS sources,"
-            "COUNT(DISTINCT e.dst) AS targets,COUNT(DISTINCT e.port) AS ports,"
-            "COUNT(DISTINCT e.proto) AS protocols" + base,
+            "SELECT MAX(g.asn_org) AS organization,COUNT(*) AS samples,"
+            "COUNT(DISTINCT e.src) AS sources,COUNT(DISTINCT e.dst) AS targets,"
+            "COUNT(DISTINCT e.port) AS ports,COUNT(DISTINCT e.proto) AS protocols" + base,
             params
         ).fetchone()
         active_bans = conn.execute(
@@ -352,6 +352,7 @@ def asn_profile(request, db_path=DB, now=None):
         return {
             "found": bool(summary["samples"]),
             "asn": value,
+            "organization": summary["organization"] or "",
             "period": period,
             "period_label": config["label"],
             "from_ts": since,
