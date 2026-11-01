@@ -1,4 +1,4 @@
-# GeoWAN Console v0.3.0（开发预览）
+# GeoWAN Console v0.4.0（开发预览）
 
 为 **OpenWrt 25.12 / firewall4 / nftables** 设计的独立 GeoIP 防护可视化和持久化伴侣，中文 LuCI 页面，无额外监听端口。
 
@@ -13,7 +13,7 @@
 - IPv4/IPv6 分别维护统计；前端只读，走现有 LuCI/rpcd 身份验证和单一状态 JSON 文件；LuCI 每 5 秒刷新。
 - 可选离线 DB-IP Lite MMDB 归属查询：国家、洲、地区/城市、ASN 和网络组织；数据在本机查询，不调用逐 IP 公网 API。
 - LuCI 提供任意公网 IPv4/IPv6 查询入口，通过只读 rpcd ubus 方法查询本地 MMDB 或已缓存结果，不开放新的 HTTP/TCP/UDP 端口。
-- v0.2.2 增加黑名单分页、筛选、IP 详情及采样事件查询；v0.3.0 增加最近 1 小时、24 小时、7 天、30 天的只读趋势分析，并按来源国家、ASN、端口、协议和 IP 汇总日志样本；所有 RPC 方法均为只读，并受 LuCI ACL 控制。
+- v0.2.2 增加黑名单分页、筛选、IP 详情及采样事件查询；v0.3.0 增加最近 1 小时、24 小时、7 天、30 天的只读趋势分析，并提供首版黑名单查询界面；v0.4.0 优化黑名单管理体验，增加 20/50/100 条分页、首页/末页导航、首次发现/最近日志样本/剩余封禁时间列、详情关闭和过期状态提示；所有 RPC 方法均为只读，并受 LuCI ACL 控制。
 - 不在 LAN/WAN 开放新端口，不将日志发布到公网，不需要 Node/npm、Docker 或独立 Web 服务。
 
 ## 运行要求
@@ -28,7 +28,7 @@
 - GeoIP 为可选功能：安装 `python3-maxminddb` 后运行 DB-IP Lite MMDB 更新器；缺少 reader 或数据库时不影响拦截与基础监控。
 - 数据库 /etc/geowan-console/telemetry.sqlite3，目录权限 0700；状态文件 /tmp/geowan-console/status.json。
 
-开发分支 `feature/geowan-console-v0.3.0` 基于已实机验收的 v0.2.2，保留只读黑名单查询 API，并增加只读 analytics RPC。趋势时间范围为 1 小时（5 分钟桶）、24 小时（小时桶）、7 天和 30 天（日桶）；来源国家、ASN、端口、协议和来源 IP 均按已采集的内核日志样本统计。由于内核日志限速，样本数不代表完整连接数或攻击总量。黑名单国家/ASN 排行仍按当前活跃封禁 IP 去重统计，两种口径在界面中分开标注。该版本不提供手动封禁/解封，不修改防火墙规则。首次安装不会自动下载约 140 MB 的 GeoIP 数据库，也不会自动启用月度更新。
+开发分支 `feature/geowan-console-v0.4.0` 基于已实机验收的 v0.3.0，不改变 SQLite schema，不新增写入型 RPC；继续复用只读 `list_bans`、`get_ban` 和 `analytics` API。黑名单界面支持 20/50/100 条每页、首页/末页导航，并展示首次发现、最近发现、最近日志样本、剩余封禁时间和日志样本数；剩余封禁时间不足 1 小时时显示提醒，详情面板可关闭，并防止较早返回的详情请求覆盖用户刚选中的 IP。趋势时间范围为 1 小时（5 分钟桶）、24 小时（小时桶）、7 天和 30 天（日桶）；来源国家、ASN、端口、协议和来源 IP 均按已采集的内核日志样本统计。由于内核日志限速，样本数不代表完整连接数或攻击总量。黑名单国家/ASN 排行仍按当前活跃封禁 IP 去重统计，两种口径在界面中分开标注。该版本不提供手动封禁/解封，不修改防火墙规则。首次安装不会自动下载约 140 MB 的 GeoIP 数据库，也不会自动启用月度更新。
 
 ## 第一阶段：只读预检
 
@@ -44,7 +44,7 @@
     apk update
     apk add python3 python3-sqlite3 python3-maxminddb git
     cd /root
-    git clone --depth 1 --branch feature/geowan-console-v0.3.0 https://github.com/Accelerator6666/openwrt-builder.git geowan-source
+    git clone --depth 1 --branch feature/geowan-console-v0.4.0 https://github.com/Accelerator6666/openwrt-builder.git geowan-source
     cd /root/geowan-source/projects/geowan-console
     sh preflight.sh
     sh install.sh
