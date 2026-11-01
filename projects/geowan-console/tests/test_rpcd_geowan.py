@@ -68,7 +68,11 @@ class RpcLookupTests(unittest.TestCase):
         plugin = Path(__file__).resolve().parents[1] / "rpcd" / "geowan"
         result = subprocess.run(
             [sys.executable, str(plugin), "list"],
-            check=True, capture_output=True, text=True
+            check=False, capture_output=True, text=True
+        )
+        self.assertEqual(
+            result.returncode, 0,
+            f"rpcd list failed: stdout={result.stdout!r}, stderr={result.stderr!r}"
         )
         self.assertEqual(json.loads(result.stdout), {"lookup": {"ip": ""}})
 
@@ -77,9 +81,21 @@ class RpcLookupTests(unittest.TestCase):
         result = subprocess.run(
             [sys.executable, str(plugin), "call", "lookup"],
             input='{"ip":"10.0.0.1"}',
-            check=True, capture_output=True, text=True
+            check=False, capture_output=True, text=True
+        )
+        self.assertEqual(
+            result.returncode, 0,
+            f"rpcd call failed: stdout={result.stdout!r}, stderr={result.stderr!r}"
         )
         self.assertEqual(json.loads(result.stdout)["lookup_status"], "non_global")
+
+    def test_non_global_lookup_does_not_open_mmdb_reader(self):
+        with mock.patch.object(
+            geowan_rpc, "GeoIPResolver",
+            side_effect=AssertionError("non-global IP must not open MMDB")
+        ):
+            result = geowan_rpc.lookup({"ip": "10.0.0.1"})
+        self.assertEqual(result["lookup_status"], "non_global")
 
     def test_uncached_lookup_uses_local_resolver(self):
         with tempfile.TemporaryDirectory() as tmp:
