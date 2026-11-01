@@ -12,6 +12,7 @@
 - GeoIP 数据库更新脚本已提供，但**不会自动排程**：首次下载需要手动执行并验证，后续月度自动更新将在单独验收后启用。它只更新离线 MMDB 文件，不修改 nftables 或 CN 前缀集合。
 - IPv4/IPv6 分别维护统计；前端只读，走现有 LuCI/rpcd 身份验证和单一状态 JSON 文件；LuCI 每 5 秒刷新。
 - 可选离线 DB-IP Lite MMDB 归属查询：国家、洲、地区/城市、ASN 和网络组织；数据在本机查询，不调用逐 IP 公网 API。
+- LuCI 提供任意公网 IPv4/IPv6 查询入口，通过只读 rpcd ubus 方法查询本地 MMDB 或已缓存结果，不开放新的 HTTP/TCP/UDP 端口。
 - 不在 LAN/WAN 开放新端口，不将日志发布到公网，不需要 Node/npm、Docker 或独立 Web 服务。
 
 ## 运行要求
@@ -26,7 +27,7 @@
 - GeoIP 为可选功能：安装 `python3-maxminddb` 后运行 DB-IP Lite MMDB 更新器；缺少 reader 或数据库时不影响拦截与基础监控。
 - 数据库 /etc/geowan-console/telemetry.sqlite3，目录权限 0700；状态文件 /tmp/geowan-console/status.json。
 
-开发分支 `feature/geowan-console-v0.2` 增加 procd 监管的快速监控进程。v0.2.0 交付快速遥测；v0.2.1 增加 DB-IP Lite 离线 GeoIP 解析、批量缓存和国家/ASN 汇总。首次安装不会自动下载约 140 MB 的 GeoIP 数据库，也不会自动启用月度更新。
+开发分支 `feature/geowan-console-v0.2` 增加 procd 监管的快速监控进程。v0.2.0 交付快速遥测；v0.2.1 增加 DB-IP Lite 离线 GeoIP 解析、批量缓存、国家/ASN 汇总和 LuCI 任意 IP 查询。首次安装不会自动下载约 140 MB 的 GeoIP 数据库，也不会自动启用月度更新。
 
 ## 第一阶段：只读预检
 
