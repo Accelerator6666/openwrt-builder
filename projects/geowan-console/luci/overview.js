@@ -32,8 +32,9 @@ function timeString(epoch) {
 }
 
 function durationString(seconds) {
-    seconds = Math.max(0, Number(seconds) || 0);
+    seconds = Math.max(0, Math.floor(Number(seconds) || 0));
     if (!seconds) return '已过期';
+    if (seconds < 60) return seconds + ' 秒';
     var days = Math.floor(seconds / 86400);
     var hours = Math.floor((seconds % 86400) / 3600);
     var minutes = Math.floor((seconds % 3600) / 60);
@@ -189,14 +190,51 @@ function blacklistPanel() {
     var summary = E('div', { 'class': 'gw-list-summary' }, '正在读取活跃黑名单……');
     var list = E('div', { 'class': 'gw-list-table' });
     var detail = E('div', { 'class': 'gw-ban-detail' });
+    var first = E('button', {
+        'type': 'button', 'class': 'cbi-button'
+    }, '首页');
     var previous = E('button', {
         'type': 'button', 'class': 'cbi-button'
     }, '上一页');
     var next = E('button', {
         'type': 'button', 'class': 'cbi-button'
     }, '下一页');
+    var last = E('button', {
+        'type': 'button', 'class': 'cbi-button'
+    }, '末页');
     var pageLabel = E('span', { 'class': 'gw-page-label' }, '第 1 页');
-    var state = { page: 1, pages: 1, busy: false };
+    var pageSize = E('select', { 'class': 'cbi-input-select' }, [
+        E('option', { 'value': '20' }, '20'),
+        E('option', { 'value': '50' }, '50'),
+        E('option', { 'value': '100' }, '100')
+    ]);
+    pageSize.value = '50';
+    var state = {
+        page: 1, pages: 1, busy: false, pageSize: 50, detailRequest: 0
+    };
+
+    function updatePager() {
+        first.disabled = state.busy || state.page <= 1;
+        previous.disabled = state.busy || state.page <= 1;
+        next.disabled = state.busy || state.page >= state.pages;
+        last.disabled = state.busy || state.page >= state.pages;
+        pageSize.disabled = state.busy;
+    }
+
+    var closeDetail = E('button', {
+        'type': 'button', 'class': 'cbi-button cbi-button-small'
+    }, '关闭详情');
+    closeDetail.addEventListener('click', function() {
+        state.detailRequest++;
+        dom.content(detail, '');
+    });
+
+    function detailHeading(ip) {
+        return E('div', { 'class': 'gw-detail-heading' }, [
+            E('h4', {}, 'IP 详情：' + ip),
+            closeDetail
+        ]);
+    }
 
     function numberOrZero(value) {
         if (value == null || String(value).trim() === '') return 0;
@@ -205,10 +243,18 @@ function blacklistPanel() {
     }
 
     function showDetail(ip) {
-        dom.content(detail, E('p', {}, '正在读取 ' + ip + ' 的详情……'));
+        var requestId = ++state.detailRequest;
+        dom.content(detail, [
+            detailHeading(ip),
+            E('p', {}, '正在读取 ' + ip + ' 的详情……')
+        ]);
         getBan(ip).then(function(data) {
+            if (requestId !== state.detailRequest) return;
             if (data.error || !data.found) {
-                dom.content(detail, '未找到该 IP 的活动封禁记录。');
+                dom.content(detail, [
+                    detailHeading(ip),
+                    E('p', {}, '未找到该 IP 的封禁记录。')
+                ]);
                 return;
             }
             var item = data.item;
@@ -223,6 +269,7 @@ function blacklistPanel() {
                 ['网络组织', item.asn_org],
                 ['GeoIP 数据库', (item.provider || '—') + ' · ' + (item.database_version || '—')],
                 ['归属查询状态', item.lookup_status],
+                ['封禁状态', item.active ? '活跃' : '已过期（等待对账清理）'],
                 ['首次发现', timeString(item.first_seen)],
                 ['最近发现', timeString(item.last_seen)],
                 ['封禁到期', timeString(item.expires_at)],
@@ -233,7 +280,7 @@ function blacklistPanel() {
                 return [timeString(event.ts), event.dst, event.port, event.proto];
             });
             dom.content(detail, E('div', {}, [
-                E('h4', {}, 'IP 详情：' + item.ip),
+                detailHeading(item.ip),
                 table(['字段', '信息'], rows),
                 E('h4', {}, '最近日志样本（最多 30 条）'),
                 table(['时间', '目标 IP', '目标端口', '协议'], events),
@@ -241,7 +288,11 @@ function blacklistPanel() {
                     '日志样本受内核限速和 30 天保留策略影响，不代表该 IP 的全部连接或全部攻击次数。')
             ]));
         }).catch(function(error) {
-            dom.content(detail, '详情查询失败：' + String(error));
+            if (requestId !== state.detailRequest) return;
+            dom.content(detail, [
+                detailHeading(ip),
+                E('p', {}, '详情查询失败：' + String(error))
+            ]);
         });
     }
 
@@ -249,10 +300,14 @@ function blacklistPanel() {
         if (data.error) {
             dom.content(summary, '查询失败：' + data.error);
             dom.content(list, '');
+            updatePager();
             return;
         }
 
+        state.page = data.page || state.page;
         state.pages = Math.max(1, data.pages || 1);
+        state.pageSize = data.page_size || state.pageSize;
+        pageSize.value = String(state.pageSize);
         dom.content(summary,
             '共 ' + data.total + ' 条活跃封禁记录 · 第 ' + data.page +
             ' / ' + state.pages + ' 页 · 每页 ' + data.page_size + ' 条。' +
@@ -261,6 +316,12 @@ function blacklistPanel() {
         var rows = (data.items || []).map(function(item) {
             var location = [item.region, item.city].filter(Boolean).join(' / ');
             var asnText = item.asn ? 'AS' + item.asn + ' ' + (item.asn_org || '') : '';
+            var remaining = Math.max(
+                0, Number(item.expires_at || 0) - Math.floor(Date.now() / 1000)
+            );
+            var ttl = E('span', {
+                'class': remaining <= 3600 ? 'gw-ttl-warn' : 'gw-ttl-ok'
+            }, durationString(remaining));
             var button = E('button', {
                 'type': 'button', 'class': 'cbi-button cbi-button-small'
             }, '详情');
@@ -273,8 +334,10 @@ function blacklistPanel() {
                 E('td', {}, item.country_name || item.country_code || '待识别'),
                 E('td', {}, location || '—'),
                 E('td', {}, asnText || '—'),
+                E('td', {}, timeString(item.first_seen)),
                 E('td', {}, timeString(item.last_seen)),
-                E('td', {}, timeString(item.expires_at)),
+                E('td', {}, timeString(item.last_event)),
+                E('td', {}, ttl),
                 E('td', {}, String(item.event_count || 0)),
                 E('td', {}, button)
             ]);
@@ -283,15 +346,14 @@ function blacklistPanel() {
         dom.content(list, E('table', { 'class': 'table gw-table gw-blacklist-table' }, [
             E('thead', {}, E('tr', {}, [
                 'IP 地址', '协议族', '国家', '地区 / 城市', 'ASN / 网络组织',
-                '最近发现', '封禁到期', '日志样本', '详情'
+                '首次发现', '最近发现', '最近日志样本', '剩余封禁', '日志样本', '详情'
             ].map(function(label) { return E('th', {}, label); }))),
             E('tbody', {}, rows.length ? rows :
-                E('tr', {}, E('td', { 'colspan': '9' }, '没有符合条件的活跃封禁记录。')))
+                E('tr', {}, E('td', { 'colspan': '11' }, '没有符合条件的活跃封禁记录。')))
         ]));
 
         pageLabel.textContent = '第 ' + data.page + ' / ' + state.pages + ' 页';
-        previous.disabled = state.busy || data.page <= 1;
-        next.disabled = state.busy || data.page >= state.pages;
+        updatePager();
     }
 
     function loadPage(page) {
@@ -299,20 +361,22 @@ function blacklistPanel() {
         var familyValue = numberOrZero(family.value);
         var asnValue = numberOrZero(asn.value);
         var portValue = numberOrZero(port.value);
-        if (familyValue < 0 || asnValue < 0 || portValue < 0) {
-            dom.content(summary, '筛选数值格式不正确。');
+        var pageSizeValue = numberOrZero(pageSize.value);
+        if (familyValue < 0 || asnValue < 0 || portValue < 0 ||
+            [20, 50, 100].indexOf(pageSizeValue) < 0) {
+            dom.content(summary, '筛选数值或每页数量不正确。');
             return;
         }
 
         state.page = page;
+        state.pageSize = pageSizeValue;
         state.busy = true;
         apply.disabled = true;
-        previous.disabled = true;
-        next.disabled = true;
+        updatePager();
         dom.content(summary, '正在查询黑名单……');
 
         listBans(
-            page, 50, query.value.trim(), familyValue,
+            page, pageSizeValue, query.value.trim(),
             country.value.trim().toUpperCase(), asnValue,
             portValue, proto.value, sort.value
         ).then(function(data) {
@@ -323,8 +387,7 @@ function blacklistPanel() {
             state.busy = false;
             apply.disabled = false;
             dom.content(summary, '黑名单查询 RPC 失败：' + String(error));
-            previous.disabled = false;
-            next.disabled = false;
+            updatePager();
         });
     }
 
@@ -332,6 +395,9 @@ function blacklistPanel() {
     query.addEventListener('keydown', function(event) {
         if (event.key == 'Enter') loadPage(1);
     });
+    first.addEventListener('click', function() { loadPage(1); });
+    last.addEventListener('click', function() { loadPage(state.pages); });
+    pageSize.addEventListener('change', function() { loadPage(1); });
     clear.addEventListener('click', function() {
         query.value = '';
         family.value = '0';
@@ -340,6 +406,7 @@ function blacklistPanel() {
         port.value = '';
         proto.value = '';
         sort.value = 'last_seen';
+        pageSize.value = '50';
         loadPage(1);
     });
     previous.addEventListener('click', function() {
@@ -364,7 +431,8 @@ function blacklistPanel() {
             '说明：端口与协议条件匹配已采集到的拒绝日志样本。')
     ]);
     var pager = E('div', { 'class': 'gw-pagination' }, [
-        previous, pageLabel, next
+        first, previous, pageLabel, next, last,
+        E('label', { 'class': 'gw-page-size' }, ['每页', pageSize, '条'])
     ]);
 
     var root = panel('持久化黑名单查询与 IP 详情', [
