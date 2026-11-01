@@ -185,6 +185,28 @@ class RpcLookupTests(unittest.TestCase):
             self.assertEqual(result["pages"], 1)
             self.assertEqual(result["items"][0]["ip"], "8.8.8.8")
             self.assertEqual(result["items"][0]["event_count"], 1)
+            self.assertEqual(result["items"][0]["first_seen"], now - 300)
+            self.assertEqual(result["items"][0]["last_event"], now - 30)
+
+    def test_list_bans_supports_frontend_page_sizes(self):
+        now = 1800000000
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "telemetry.sqlite3"
+            make_inventory_db(path, now)
+            with mock.patch.object(
+                geowan_rpc, "read_metadata", return_value={"release": "2026-11"}
+            ):
+                for size in (20, 50, 100):
+                    result = geowan_rpc.list_bans(
+                        {"page": 1, "page_size": size}, db_path=path, now=now
+                    )
+                    self.assertEqual(result["page_size"], size)
+                    self.assertEqual(len(result["items"]), 3)
+
+                invalid = geowan_rpc.list_bans(
+                    {"page": 1, "page_size": 10}, db_path=path, now=now
+                )
+            self.assertEqual(invalid, {"error": "invalid_parameters"})
 
     def test_list_bans_filters_country_asn_port_and_proto(self):
         now = 1800000000
