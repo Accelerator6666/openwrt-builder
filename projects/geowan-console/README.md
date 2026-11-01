@@ -62,6 +62,7 @@
 
     /usr/bin/python3 /usr/libexec/geowan-console/agent.py collect
     /usr/bin/python3 /usr/libexec/geowan-console/agent.py restore
+    /usr/bin/python3 /usr/libexec/geowan-console/agent.py lookup 8.8.8.8
     cat /tmp/geowan-console/status.json
     nft list set inet fw4 geo_black4
     grep geowan-console /etc/crontabs/root
