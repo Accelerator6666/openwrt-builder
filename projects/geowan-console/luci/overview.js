@@ -718,7 +718,7 @@ function profilePanel() {
             ];
         });
         dom.content(asnResult, [
-            E('p', {}, 'AS' + data.asn + ' · ' + data.period_label),
+            E('p', {}, 'AS' + data.asn + ' ' + (data.organization || '') + ' · ' + data.period_label),
             metrics,
             E('div', { 'class': 'gw-columns gw-profile-columns' }, [
                 panel('样本最多的来源 IP', table(['来源 IP', '国家', '城市', '样本数'],
