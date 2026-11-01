@@ -40,14 +40,14 @@
     apk update
     apk add python3 python3-sqlite3 git
     cd /root
-    git clone --depth 1 --branch feature/geowan-console-v0.1 https://github.com/Accelerator6666/openwrt-builder.git geowan-source
+    git clone --depth 1 --branch feature/geowan-console-v0.2 https://github.com/Accelerator6666/openwrt-builder.git geowan-source
     cd /root/geowan-source/projects/geowan-console
     sh preflight.sh
     sh install.sh
 
 打开 LuCI：**服务 → GeoWAN 安全面板**。
 
-安装会先检查所需 nftables 对象及 fw4 check。自动任务只有每 5 分钟采集与尝试恢复；每周 GeoIP 更新**保持关闭**，直到现有更新脚本通过独立语法修复和实机验证。
+安装会先检查所需 nftables 对象及 fw4 check。安装后启动 procd 监管的快速监控：计数器每 5 秒采样，动态集合与日志每 15 秒扫描；原有每 5 分钟恢复/全量对账任务保留。GeoIP 自动更新仍关闭，离线国家/城市/ASN 查询尚未在本里程碑交付。
 
 ## 验收命令
 
