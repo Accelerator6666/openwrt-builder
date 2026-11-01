@@ -13,3 +13,14 @@
 .gw-analytics-columns{margin-top:16px}
 @media(max-width:700px){.gw-analytics-metrics{grid-template-columns:1fr 1fr}}
 @media(max-width:420px){.gw-analytics-metrics{grid-template-columns:1fr}.gw-analytics-controls label{width:100%}.gw-analytics-controls button{width:100%}}
+
+/* v0.4.0 blacklist management controls */
+.gw-pagination{flex-wrap:wrap}
+.gw-page-size{display:flex;align-items:center;gap:7px;color:#69778b;font-size:12px}
+.gw-page-size select{min-width:72px;min-height:34px}
+.gw-detail-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.gw-detail-heading h4{margin:8px 0}
+.gw-ttl-ok{font-weight:600;color:#217a55}
+.gw-ttl-warn{display:inline-block;padding:3px 7px;border-radius:6px;background:#fff0d6;color:#a55000;font-weight:700}
+.gw-blacklist-table{min-width:1450px}
+@media(max-width:520px){.gw-page-size{width:100%;justify-content:center}.gw-detail-heading{align-items:flex-start}}
