@@ -5,6 +5,9 @@
       "ubus": {
         "file": [
           "read"
+        ],
+        "geowan": [
+          "lookup"
         ]
       },
       "file": {
