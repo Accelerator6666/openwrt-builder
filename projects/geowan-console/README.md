@@ -7,7 +7,7 @@
 
 ## 功能
 
-- LuCI → 服务 → **GeoWAN 安全面板**：当前被阻断 IP、包计数、过去 24 小时拦截日志趋势、来源 IP、目标端口、最近事件、过期时间。
+- LuCI → 服务 → **GeoWAN 安全面板**：当前被阻断 IP、包计数、可选时间范围的拦截日志趋势、来源 IP、国家、ASN、目标端口、协议、最近事件和过期时间。
 - SQLite 持久保存被封锁 IP 和最近 30 天的**采样**内核日志；v0.2 快速监控每 5 秒采样计数器、每 15 秒盘点动态集合和扫描日志；每 5 分钟保留一次恢复/全量对账任务。
 - GeoIP 数据库更新脚本已提供，但**不会自动排程**：首次下载需要手动执行并验证，后续月度自动更新将在单独验收后启用。它只更新离线 MMDB 文件，不修改 nftables 或 CN 前缀集合。
 - IPv4/IPv6 分别维护统计；前端只读，走现有 LuCI/rpcd 身份验证和单一状态 JSON 文件；LuCI 每 5 秒刷新。
@@ -44,7 +44,7 @@
     apk update
     apk add python3 python3-sqlite3 python3-maxminddb git
     cd /root
-    git clone --depth 1 --branch feature/geowan-console-v0.2.2 https://github.com/Accelerator6666/openwrt-builder.git geowan-source
+    git clone --depth 1 --branch feature/geowan-console-v0.3.0 https://github.com/Accelerator6666/openwrt-builder.git geowan-source
     cd /root/geowan-source/projects/geowan-console
     sh preflight.sh
     sh install.sh
