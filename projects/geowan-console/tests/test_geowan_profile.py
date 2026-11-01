@@ -130,6 +130,7 @@ class GeoWANProfileTests(unittest.TestCase):
         self.assertTrue(result["found"])
         self.assertEqual(result["unique_sources"], 3)
         self.assertEqual(result["samples"], 5)
+        self.assertEqual(result["organization"], "Google LLC")
         self.assertEqual(result["active_banned_sources"], 1)
         self.assertEqual(result["top_ports"][0]["port"], 443)
         self.assertEqual(result["correlations"][0]["source_count"], 3)
