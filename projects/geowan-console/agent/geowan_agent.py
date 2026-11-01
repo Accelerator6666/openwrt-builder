@@ -281,7 +281,8 @@ def publish_status(status):
 def cleanup_geoip_cache(conn, now):
     """Retain inactive GeoIP cache rows for 90 days."""
     conn.execute(
-        "DELETE FROM geoip_cache WHERE updated_at < ?",
+        "DELETE FROM geoip_cache WHERE ip IN ("
+        "SELECT ip FROM geoip_cache WHERE updated_at < ? LIMIT 1000)",
         (int(now) - 90 * 86400,)
     )
 
