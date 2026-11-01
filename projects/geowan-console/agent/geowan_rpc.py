@@ -18,7 +18,24 @@ def lookup(request, db_path=DB, resolver_factory=GeoIPResolver):
     except ValueError:
         return {"ip": value.strip(), "lookup_status": "invalid"}
 
-    version = str(read_metadata().get("release") or "unknown")
+    metadata = read_metadata()
+    version = str(metadata.get("release") or "unknown")
+    if not address.is_global:
+        return {
+            "ip": str(address),
+            "country_code": "",
+            "country_name": "",
+            "continent_code": "",
+            "continent_name": "",
+            "region": "",
+            "city": "",
+            "asn": None,
+            "asn_org": "",
+            "provider": str(metadata.get("provider") or "DB-IP Lite"),
+            "database_version": version,
+            "lookup_status": "non_global"
+        }
+
     if address.is_global:
         conn = None
         try:
