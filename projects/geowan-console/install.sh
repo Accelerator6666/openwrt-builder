@@ -47,8 +47,10 @@ mkdir -p /usr/libexec/geowan-console \
 chmod 700 /etc/geowan-console
 
 cp "$BASE/agent/geowan_agent.py" /usr/libexec/geowan-console/agent.py
+cp "$BASE/agent/geowan_geoip.py" /usr/libexec/geowan-console/geowan_geoip.py
 cp "$BASE/scripts/task.sh" /usr/libexec/geowan-console/task.sh
 cp "$BASE/scripts/update.sh" /usr/libexec/geowan-console/update.sh
+cp "$BASE/scripts/update-geoip.sh" /usr/libexec/geowan-console/update-geoip.sh
 cp "$BASE/scripts/init.sh" /etc/init.d/geowan-console
 cp "$BASE/scripts/monitor.init.sh" /etc/init.d/geowan-monitor
 cp "$BASE/luci/overview.js" /www/luci-static/resources/view/geowan/overview.js
@@ -58,7 +60,8 @@ cp "$BASE/luci/acl.json" /usr/share/rpcd/acl.d/luci-app-geowan-console.json
 
 chmod 700 /usr/libexec/geowan-console/agent.py \
     /usr/libexec/geowan-console/task.sh \
-    /usr/libexec/geowan-console/update.sh
+    /usr/libexec/geowan-console/update.sh \
+    /usr/libexec/geowan-console/update-geoip.sh
 chmod 755 /etc/init.d/geowan-console
 chmod 755 /etc/init.d/geowan-monitor
 chmod 644 /usr/share/luci/menu.d/luci-app-geowan-console.json \
@@ -82,4 +85,7 @@ rm -f /tmp/luci-indexcache
 echo "GeoWAN Console installed. Open LuCI -> Services -> GeoWAN 安全面板."
 echo "Database: /etc/geowan-console/telemetry.sqlite3"
 echo "Fast monitor: counters every 5s, blacklist inventory/log scan every 15s; 5-minute reconciliation remains enabled."
+if ! /usr/bin/python3 -c 'import maxminddb' >/dev/null 2>&1; then
+    echo "GeoIP lookup is optional and inactive. Install with: apk add python3-maxminddb"
+fi
 echo "No new TCP/UDP port and no firewall rules modified."
