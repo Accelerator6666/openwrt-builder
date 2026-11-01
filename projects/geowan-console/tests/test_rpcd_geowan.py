@@ -4,6 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 import tempfile
+import time
 import unittest
 from unittest import mock
 
@@ -28,6 +29,62 @@ class FakeResolver:
 
     def close(self):
         pass
+
+
+def make_inventory_db(path, now):
+    conn = sqlite3.connect(path)
+    conn.executescript("""
+        CREATE TABLE bans(
+            ip TEXT PRIMARY KEY,family INTEGER NOT NULL,
+            first_seen INTEGER NOT NULL,last_seen INTEGER NOT NULL,
+            expires_at INTEGER NOT NULL
+        );
+        CREATE TABLE geoip_cache(
+            ip TEXT PRIMARY KEY,country_code TEXT NOT NULL DEFAULT '',
+            country_name TEXT NOT NULL DEFAULT '',continent_code TEXT NOT NULL DEFAULT '',
+            continent_name TEXT NOT NULL DEFAULT '',region TEXT NOT NULL DEFAULT '',
+            city TEXT NOT NULL DEFAULT '',asn INTEGER,asn_org TEXT NOT NULL DEFAULT '',
+            provider TEXT NOT NULL DEFAULT '',database_version TEXT NOT NULL DEFAULT '',
+            lookup_status TEXT NOT NULL,updated_at INTEGER NOT NULL
+        );
+        CREATE TABLE events(
+            id TEXT PRIMARY KEY,ts INTEGER NOT NULL,family INTEGER NOT NULL,
+            src TEXT NOT NULL,dst TEXT,port INTEGER,proto TEXT
+        );
+        CREATE INDEX idx_events_src_ts ON events(src,ts);
+    """)
+    conn.executemany(
+        "INSERT INTO bans VALUES(?,?,?,?,?)",
+        [
+            ("8.8.8.8", 4, now - 300, now - 10, now + 600),
+            ("1.1.1.1", 4, now - 200, now - 20, now + 900),
+            ("2001:4860:4860::8888", 6, now - 100, now - 5, now + 1200)
+        ]
+    )
+    conn.executemany(
+        "INSERT INTO geoip_cache VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        [
+            ("8.8.8.8", "US", "美国", "NA", "北美洲", "California",
+             "Mountain View", 15169, "Google LLC", "DB-IP Lite",
+             "2026-11", "ok", now),
+            ("1.1.1.1", "AU", "澳大利亚", "OC", "大洋洲", "New South Wales",
+             "Sydney", 13335, "Cloudflare, Inc.", "DB-IP Lite",
+             "2026-11", "ok", now),
+            ("2001:4860:4860::8888", "US", "美国", "NA", "北美洲", "California",
+             "Mountain View", 15169, "Google LLC", "DB-IP Lite",
+             "2026-11", "ok", now)
+        ]
+    )
+    conn.executemany(
+        "INSERT INTO events VALUES(?,?,?,?,?,?,?)",
+        [
+            ("evt1", now - 30, 4, "8.8.8.8", "10.0.0.61", 31080, "TCP"),
+            ("evt2", now - 20, 4, "1.1.1.1", "10.0.0.61", 53, "UDP"),
+            ("evt3", now - 10, 6, "2001:4860:4860::8888", "2001:db8::1", 443, "TCP")
+        ]
+    )
+    conn.commit()
+    conn.close()
 
 
 class RpcLookupTests(unittest.TestCase):
@@ -74,7 +131,11 @@ class RpcLookupTests(unittest.TestCase):
             result.returncode, 0,
             f"rpcd list failed: stdout={result.stdout!r}, stderr={result.stderr!r}"
         )
-        self.assertEqual(json.loads(result.stdout), {"lookup": {"ip": ""}})
+        methods = json.loads(result.stdout)
+        self.assertEqual(set(methods), {"lookup", "list_bans", "get_ban"})
+        self.assertEqual(methods["lookup"], {"ip": ""})
+        self.assertEqual(methods["get_ban"], {"ip": ""})
+        self.assertEqual(methods["list_bans"]["page_size"], 50)
 
     def test_rpcd_plugin_call_protocol(self):
         plugin = Path(__file__).resolve().parents[1] / "rpcd" / "geowan"
@@ -106,6 +167,82 @@ class RpcLookupTests(unittest.TestCase):
             )
             self.assertEqual(result["country_code"], "US")
             self.assertEqual(result["city"], "Mountain View")
+
+    def test_list_bans_paginates_active_records(self):
+        now = 1800000000
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "telemetry.sqlite3"
+            make_inventory_db(path, now)
+            with mock.patch.object(
+                geowan_rpc, "read_metadata", return_value={"release": "2026-11"}
+            ):
+                result = geowan_rpc.list_bans(
+                    {"page": 1, "page_size": 20}, db_path=path, now=now
+                )
+            self.assertEqual(result["total"], 3)
+            self.assertEqual(len(result["items"]), 3)
+            self.assertEqual(result["pages"], 1)
+            self.assertEqual(result["items"][0]["ip"], "8.8.8.8")
+            self.assertEqual(result["items"][0]["event_count"], 1)
+
+    def test_list_bans_filters_country_asn_port_and_proto(self):
+        now = 1800000000
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "telemetry.sqlite3"
+            make_inventory_db(path, now)
+            with mock.patch.object(
+                geowan_rpc, "read_metadata", return_value={"release": "2026-11"}
+            ):
+                country = geowan_rpc.list_bans(
+                    {"country_code": "au"}, db_path=path, now=now
+                )
+                asn = geowan_rpc.list_bans(
+                    {"asn": 15169}, db_path=path, now=now
+                )
+                port = geowan_rpc.list_bans(
+                    {"port": 31080, "proto": "tcp"}, db_path=path, now=now
+                )
+                query = geowan_rpc.list_bans(
+                    {"query": "Mountain"}, db_path=path, now=now
+                )
+            self.assertEqual([r["ip"] for r in country["items"]], ["1.1.1.1"])
+            self.assertEqual(asn["total"], 2)
+            self.assertEqual([r["ip"] for r in port["items"]], ["8.8.8.8"])
+            self.assertEqual(query["total"], 2)
+
+    def test_list_bans_rejects_invalid_filters(self):
+        result = geowan_rpc.list_bans({"port": 70000})
+        self.assertEqual(result, {"error": "invalid_parameters"})
+
+    def test_get_ban_returns_geoip_and_bounded_event_history(self):
+        now = 1800000000
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "telemetry.sqlite3"
+            make_inventory_db(path, now)
+            with mock.patch.object(
+                geowan_rpc, "read_metadata", return_value={"release": "2026-11"}
+            ):
+                result = geowan_rpc.get_ban(
+                    {"ip": "8.8.8.8"}, db_path=path, now=now
+                )
+            self.assertTrue(result["found"])
+            self.assertEqual(result["item"]["country_code"], "US")
+            self.assertEqual(result["item"]["remaining_seconds"], 600)
+            self.assertEqual(result["item"]["event_count"], 1)
+            self.assertEqual(len(result["item"]["events"]), 1)
+
+    def test_get_ban_reports_missing_record(self):
+        now = 1800000000
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "telemetry.sqlite3"
+            make_inventory_db(path, now)
+            with mock.patch.object(
+                geowan_rpc, "read_metadata", return_value={"release": "2026-11"}
+            ):
+                result = geowan_rpc.get_ban(
+                    {"ip": "9.9.9.9"}, db_path=path, now=now
+                )
+            self.assertEqual(result, {"found": False, "ip": "9.9.9.9"})
 
 
 if __name__ == "__main__":
