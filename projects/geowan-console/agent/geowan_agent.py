@@ -37,6 +37,8 @@ def db_open():
     DB.parent.mkdir(parents=True, exist_ok=True)
     DB.parent.chmod(0o700)
     conn = sqlite3.connect(str(DB), timeout=20)
+    # The database contains source IPs and firewall event metadata.
+    os.chmod(DB, 0o600)
     conn.execute("PRAGMA busy_timeout=20000")
     conn.execute("""CREATE TABLE IF NOT EXISTS events(
         id TEXT PRIMARY KEY, ts INTEGER NOT NULL, family INTEGER NOT NULL,
