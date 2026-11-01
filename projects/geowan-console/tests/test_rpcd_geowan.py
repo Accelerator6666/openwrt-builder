@@ -58,7 +58,7 @@ def make_inventory_db(path, now):
         [
             ("8.8.8.8", 4, now - 300, now - 10, now + 600),
             ("1.1.1.1", 4, now - 200, now - 20, now + 900),
-            ("2001:4860:4860::8888", 6, now - 100, now - 5, now + 1200)
+            ("2001:4860:4860::8888", 6, now - 100, now - 40, now + 1200)
         ]
     )
     conn.executemany(
