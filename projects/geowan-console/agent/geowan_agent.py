@@ -262,7 +262,7 @@ def publish_status(status):
             os.unlink(name)
 
 
-def monitor_cycle(state):
+def monitor_cycle(state, conn):
     """Run one fast telemetry cycle; never alter nftables rules or DNAT."""
     try:
         COLLECT_LOCK.mkdir(mode=0o700)
@@ -271,32 +271,27 @@ def monitor_cycle(state):
 
     try:
         now = int(time.time())
-        conn = db_open()
-        try:
-            mono = time.monotonic()
-            errors = []
-            if state["last_inventory"] == 0 or mono - state["last_inventory_mono"] >= INVENTORY_INTERVAL:
-                sizes, errors = snapshot_incremental(conn, now)
-                state["sizes"] = sizes
-                state["errors"] = errors
-                state["last_inventory"] = now
-                state["last_inventory_mono"] = mono
-            if state["last_log_mono"] == 0 or mono - state["last_log_mono"] >= LOG_SCAN_INTERVAL:
-                insert_log_samples(conn, now)
-                state["last_log_mono"] = mono
-            conn.commit()
-            status = build_status(conn, now, state["sizes"], state["errors"])
-            status["collector"] = {
-                "mode": "fast",
-                "counter_interval_seconds": MONITOR_INTERVAL,
-                "inventory_interval_seconds": INVENTORY_INTERVAL,
-                "log_scan_interval_seconds": LOG_SCAN_INTERVAL,
-                "last_inventory": state["last_inventory"]
-            }
-            publish_status(status)
-            return True
-        finally:
-            conn.close()
+        mono = time.monotonic()
+        if state["last_inventory"] == 0 or mono - state["last_inventory_mono"] >= INVENTORY_INTERVAL:
+            sizes, errors = snapshot_incremental(conn, now)
+            state["sizes"] = sizes
+            state["errors"] = errors
+            state["last_inventory"] = now
+            state["last_inventory_mono"] = mono
+        if state["last_log_mono"] == 0 or mono - state["last_log_mono"] >= LOG_SCAN_INTERVAL:
+            insert_log_samples(conn, now)
+            state["last_log_mono"] = mono
+        conn.commit()
+        status = build_status(conn, now, state["sizes"], state["errors"])
+        status["collector"] = {
+            "mode": "fast",
+            "counter_interval_seconds": MONITOR_INTERVAL,
+            "inventory_interval_seconds": INVENTORY_INTERVAL,
+            "log_scan_interval_seconds": LOG_SCAN_INTERVAL,
+            "last_inventory": state["last_inventory"]
+        }
+        publish_status(status)
+        return True
     finally:
         try:
             COLLECT_LOCK.rmdir()
@@ -321,16 +316,20 @@ def monitor():
 
     signal.signal(signal.SIGTERM, request_stop)
     signal.signal(signal.SIGINT, request_stop)
+    conn = db_open()
     print("GeoWAN fast monitor started: counters=5s, inventory=15s, logs=15s", flush=True)
-    while not stopping:
-        started = time.monotonic()
-        try:
-            monitor_cycle(state)
-        except Exception as exc:
-            print(f"GeoWAN monitor cycle failed: {exc}", flush=True)
-        delay = max(0.0, MONITOR_INTERVAL - (time.monotonic() - started))
-        if not stopping:
-            time.sleep(delay)
+    try:
+        while not stopping:
+            started = time.monotonic()
+            try:
+                monitor_cycle(state, conn)
+            except Exception as exc:
+                print(f"GeoWAN monitor cycle failed: {exc}", flush=True)
+            delay = max(0.0, MONITOR_INTERVAL - (time.monotonic() - started))
+            if not stopping:
+                time.sleep(delay)
+    finally:
+        conn.close()
     print("GeoWAN fast monitor stopped", flush=True)
 
 
