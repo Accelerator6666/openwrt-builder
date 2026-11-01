@@ -368,7 +368,6 @@ function blacklistPanel() {
             return;
         }
 
-        state.page = page;
         state.pageSize = pageSizeValue;
         state.busy = true;
         apply.disabled = true;
@@ -376,7 +375,7 @@ function blacklistPanel() {
         dom.content(summary, '正在查询黑名单……');
 
         listBans(
-            page, pageSizeValue, query.value.trim(),
+            page, pageSizeValue, query.value.trim(), familyValue,
             country.value.trim().toUpperCase(), asnValue,
             portValue, proto.value, sort.value
         ).then(function(data) {
