@@ -71,6 +71,7 @@ def db_open():
     conn.execute("CREATE INDEX IF NOT EXISTS idx_events_port_ts ON events(port,ts)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_geoip_country ON geoip_cache(country_code)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_geoip_asn ON geoip_cache(asn)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_geoip_updated ON geoip_cache(updated_at)")
     conn.commit()
     return conn
 
@@ -275,6 +276,15 @@ def publish_status(status):
 
 
 
+
+
+def cleanup_geoip_cache(conn, now):
+    """Retain inactive GeoIP cache rows for 90 days."""
+    conn.execute(
+        "DELETE FROM geoip_cache WHERE updated_at < ?",
+        (int(now) - 90 * 86400,)
+    )
+
 def enrich_pending(conn, resolver, now=None, limit=250):
     """Resolve a bounded batch of active bans; no network API calls are made."""
     if resolver is None or not resolver.available:
@@ -405,6 +415,9 @@ def monitor_cycle(state, conn):
         if resolver and resolver.available and mono - state["last_geoip_mono"] >= 15:
             state["geoip_enriched"] = enrich_pending(conn, resolver, now, limit=250)
             state["last_geoip_mono"] = mono
+        if mono - state["last_geoip_cleanup_mono"] >= 3600:
+            cleanup_geoip_cache(conn, now)
+            state["last_geoip_cleanup_mono"] = mono
         conn.commit()
         status = build_status(conn, now, state["sizes"], state["errors"])
         status["collector"] = {
@@ -432,6 +445,7 @@ def monitor():
         "last_inventory_mono": 0.0,
         "last_log_mono": 0.0,
         "last_geoip_mono": 0.0,
+        "last_geoip_cleanup_mono": 0.0,
         "geoip_enriched": 0,
         "geoip_resolver": GeoIPResolver()
     }
@@ -473,6 +487,7 @@ def collect():
         sizes, errors = snapshot(conn, now)
         insert_log_samples(conn, now)
         enrich_pending(conn, resolver, now, limit=250)
+        cleanup_geoip_cache(conn, now)
     status = build_status(conn, now, sizes, errors)
     resolver.close()
     status["collector"] = {
