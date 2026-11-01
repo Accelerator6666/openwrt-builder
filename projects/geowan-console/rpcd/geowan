@@ -1,0 +1,23 @@
+#!/usr/bin/python3
+"""rpcd executable plugin exposing read-only GeoWAN IP lookup."""
+import json
+import sys
+
+sys.path.insert(0, "/usr/libexec/geowan-console")
+from geowan_rpc import dispatch
+
+if len(sys.argv) < 2:
+    raise SystemExit(2)
+
+if sys.argv[1] == "list":
+    print(json.dumps({"lookup": {"ip": ""}}))
+elif sys.argv[1] == "call" and len(sys.argv) >= 3:
+    try:
+        request = json.load(sys.stdin)
+        response = dispatch(sys.argv[2], request)
+        print(json.dumps(response, ensure_ascii=False, separators=(",", ":")))
+    except Exception as exc:
+        print(json.dumps({"error": str(exc)}, ensure_ascii=False))
+        raise SystemExit(1)
+else:
+    raise SystemExit(2)
