@@ -116,7 +116,7 @@ function lookupPanel() {
         E('div', { 'class': 'gw-lookup' }, [input, button, result]));
 }
 
-function draw(d) {
+function draw(d, lookupNode) {
     var counters = d.counters || {};
     var total = (counters.black4 || 0) + (counters.geo4 || 0) +
                 (counters.black6 || 0) + (counters.geo6 || 0);
@@ -149,6 +149,7 @@ function draw(d) {
             card('IPv4 / IPv6 集合', (d.set_sizes && d.set_sizes['4'] != null ? d.set_sizes['4'] : '?')
                 + ' / ' + (d.set_sizes && d.set_sizes['6'] != null ? d.set_sizes['6'] : '?'), '活跃 IP 条目数')
         ]),
+        lookupNode || E('span'),
         panel('24 小时拦截日志趋势（采样）', [
             bars,
             E('div', { 'class': 'gw-chart-axis' }, ['23 小时前', '当前'])
@@ -191,13 +192,11 @@ return view.extend({
     },
     render: function(data) {
         var lookup = lookupPanel();
-        var app = draw(data);
-        app.appendChild(lookup);
+        var app = draw(data, lookup);
         var root = E('div', {}, app);
         poll.add(function() {
             return readStatus('/tmp/geowan-console/status.json').then(function(next) {
-                var refreshed = draw(dataFromRpc(next));
-                refreshed.appendChild(lookup);
+                var refreshed = draw(dataFromRpc(next), lookup);
                 dom.content(root, refreshed);
             }).catch(function() {
                 /* Keep the last known snapshot visible during an RPC outage. */
