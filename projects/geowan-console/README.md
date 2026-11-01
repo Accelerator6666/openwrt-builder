@@ -1,4 +1,4 @@
-# GeoWAN Console v0.2.1（开发预览）
+# GeoWAN Console v0.2.2（开发预览）
 
 为 **OpenWrt 25.12 / firewall4 / nftables** 设计的独立 GeoIP 防护可视化和持久化伴侣，中文 LuCI 页面，无额外监听端口。
 
@@ -13,6 +13,7 @@
 - IPv4/IPv6 分别维护统计；前端只读，走现有 LuCI/rpcd 身份验证和单一状态 JSON 文件；LuCI 每 5 秒刷新。
 - 可选离线 DB-IP Lite MMDB 归属查询：国家、洲、地区/城市、ASN 和网络组织；数据在本机查询，不调用逐 IP 公网 API。
 - LuCI 提供任意公网 IPv4/IPv6 查询入口，通过只读 rpcd ubus 方法查询本地 MMDB 或已缓存结果，不开放新的 HTTP/TCP/UDP 端口。
+- v0.2.2 增加黑名单分页、筛选、IP 详情及采样事件查询；所有新 RPC 方法均为只读，并受 LuCI ACL 控制。
 - 不在 LAN/WAN 开放新端口，不将日志发布到公网，不需要 Node/npm、Docker 或独立 Web 服务。
 
 ## 运行要求
@@ -27,7 +28,7 @@
 - GeoIP 为可选功能：安装 `python3-maxminddb` 后运行 DB-IP Lite MMDB 更新器；缺少 reader 或数据库时不影响拦截与基础监控。
 - 数据库 /etc/geowan-console/telemetry.sqlite3，目录权限 0700；状态文件 /tmp/geowan-console/status.json。
 
-开发分支 `feature/geowan-console-v0.2` 增加 procd 监管的快速监控进程。v0.2.0 交付快速遥测；v0.2.1 增加 DB-IP Lite 离线 GeoIP 解析、批量缓存、国家/ASN 汇总和 LuCI 任意 IP 查询。首次安装不会自动下载约 140 MB 的 GeoIP 数据库，也不会自动启用月度更新。
+开发分支 `feature/geowan-console-v0.2.2` 在 v0.2.1 基础上增加只读黑名单查询 API：分页列出活跃封禁 IP，支持 IP/国家/城市/网络组织搜索、IPv4/IPv6、国家代码、ASN、目标端口和协议筛选，并可查看单个 IP 的归属信息、封禁时间及最多 30 条日志样本。目标端口/协议过滤依赖受内核日志限速影响的采样事件，不能代表完整连接记录。该版本不提供手动封禁/解封，不修改防火墙规则。首次安装不会自动下载约 140 MB 的 GeoIP 数据库，也不会自动启用月度更新。
 
 ## 第一阶段：只读预检
 
@@ -43,7 +44,7 @@
     apk update
     apk add python3 python3-sqlite3 python3-maxminddb git
     cd /root
-    git clone --depth 1 --branch feature/geowan-console-v0.2 https://github.com/Accelerator6666/openwrt-builder.git geowan-source
+    git clone --depth 1 --branch feature/geowan-console-v0.2.2 https://github.com/Accelerator6666/openwrt-builder.git geowan-source
     cd /root/geowan-source/projects/geowan-console
     sh preflight.sh
     sh install.sh
