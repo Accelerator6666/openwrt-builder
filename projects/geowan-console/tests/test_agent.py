@@ -59,6 +59,45 @@ class AgentTests(unittest.TestCase):
                 self.assertEqual(third[2], now + 600 + g.MAX_TTL)
                 conn.close()
 
+    def test_enrich_pending_persists_geoip_cache(self):
+        class Resolver:
+            available = True
+            version = "2026-11"
+
+            def lookup(self, ip):
+                return {
+                    "country_code": "US",
+                    "country_name": "美国",
+                    "continent_code": "NA",
+                    "continent_name": "北美洲",
+                    "region": "California",
+                    "city": "Mountain View",
+                    "asn": 15169,
+                    "asn_org": "Google LLC",
+                    "provider": "DB-IP Lite",
+                    "database_version": self.version,
+                    "lookup_status": "ok"
+                }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.object(g, "DB", Path(tmp) / "db.sqlite"):
+                conn = g.db_open()
+                now = 1800000000
+                conn.execute("INSERT INTO bans VALUES(?,?,?,?,?)",
+                             ("8.8.8.8", 4, now - 10, now, now + 600))
+                count = g.enrich_pending(conn, Resolver(), now, limit=10)
+                row = conn.execute(
+                    "SELECT country_code,country_name,city,asn,asn_org,lookup_status "
+                    "FROM geoip_cache WHERE ip=?",
+                    ("8.8.8.8",)
+                ).fetchone()
+                self.assertEqual(count, 1)
+                self.assertEqual(
+                    row, ("US", "美国", "Mountain View", 15169, "Google LLC", "ok")
+                )
+                self.assertEqual(g.enrich_pending(conn, Resolver(), now, limit=10), 0)
+                conn.close()
+
     def test_nft_json_inventory(self):
         example = {"nftables": [{"metainfo": {}}, {"set": {
             "name": "geo_black4", "elem": [
