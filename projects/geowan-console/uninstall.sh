@@ -5,12 +5,14 @@ set -eu
 /etc/init.d/geowan-console disable 2>/dev/null || :
 sed -i '/# geowan-console-collect/d; /# geowan-console-update/d' /etc/crontabs/root
 /etc/init.d/cron restart
+rm -f /usr/libexec/rpcd/geowan
 rm -f /etc/init.d/geowan-console /etc/init.d/geowan-monitor \
     /usr/share/luci/menu.d/luci-app-geowan-console.json \
     /usr/share/rpcd/acl.d/luci-app-geowan-console.json \
     /www/luci-static/resources/view/geowan/overview.js \
     /www/luci-static/resources/geowan/geowan.css
 rm -rf /usr/libexec/geowan-console
+/etc/init.d/rpcd restart 2>/dev/null || :
 rm -f /tmp/luci-indexcache
 /etc/init.d/rpcd restart
 if [ "${1:-}" = "--purge-data" ]; then
