@@ -12,9 +12,9 @@ import geowan_agent as g
 
 
 class AgentTests(unittest.TestCase):
-    def test_ipv4_nft_member_expiry_milliseconds(self):
+    def test_ipv4_nft_member_expiry_seconds(self):
         self.assertEqual(
-            g.parse_member({"elem": {"val": "8.8.8.8", "expires": 120000}}, 4),
+            g.parse_member({"elem": {"val": "8.8.8.8", "expires": 120}}, 4),
             ("8.8.8.8", 120),
         )
         self.assertIsNone(g.parse_member({"elem": {"val": "8.8.8.8"}}, 6))
@@ -23,8 +23,8 @@ class AgentTests(unittest.TestCase):
     def test_nft_json_inventory(self):
         example = {"nftables": [{"metainfo": {}}, {"set": {
             "name": "geo_black4", "elem": [
-                {"elem": {"val": "8.8.8.8", "expires": 30000}},
-                {"elem": {"val": "1.1.1.1", "expires": 60000}}
+                {"elem": {"val": "8.8.8.8", "expires": 30}},
+                {"elem": {"val": "1.1.1.1", "expires": 60}}
             ]
         }}]}
         with mock.patch.object(g, "cmd", return_value=json.dumps(example)):
